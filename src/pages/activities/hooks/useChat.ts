@@ -58,7 +58,7 @@ export function useChat() {
   // previewComponents 变化时重新生成 canvasItems（保留已有的 variantId 和 params 修改）
   useEffect(() => {
     setCanvasItems((prev) =>
-      toCanvasItems(previewComponents).map((item, i) => {
+      toCanvasItems(previewComponents).map((item) => {
         const existing = prev.find((p) => p.name === item.name)
         return existing
           ? { ...item, variantId: existing.variantId, params: { ...item.params, ...existing.params } }

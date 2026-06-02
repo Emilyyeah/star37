@@ -2,7 +2,7 @@
    布局：左栏（会话/组件面板） | 中栏（对话流/画布） | 右栏（3 Tab：活动预览 / 组件配置 / 活动配置） */
 
 import { useState, useEffect } from 'react'
-import { Sparkles, MousePointerClick, Settings, Puzzle, Eye, ChevronDown } from 'lucide-react'
+import { Sparkles, MousePointerClick, Settings, Puzzle, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
 import { useUIStore } from '@/lib/uiStore'

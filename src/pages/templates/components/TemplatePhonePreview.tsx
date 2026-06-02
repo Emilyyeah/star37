@@ -2,7 +2,7 @@
    改这里的内容，两个页面同步生效 */
 
 import { PhoneShell } from '@/components/PhoneShell'
-import type { PreviewConfig } from './data/mockTemplates'
+import type { PreviewConfig } from '../data/mockTemplates'
 
 /* ── 各主玩法 Widget ── */
 
@@ -71,7 +71,7 @@ function CheckinWidget({ accent }: { accent: string }) {
 function TasksWidget({ accent }: { accent: string }) {
   return (
     <div className="w-full h-full flex flex-col justify-center gap-1.5 px-1">
-      {['每日分享', '邀请好友', '观看视频'].map((t, i) => (
+      {['每日分享', '邀请好友', '观看视频'].map((_t, i) => (
         <div key={i} className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center"
             style={{ background: i === 0 ? accent : 'rgba(255,255,255,0.15)' }}>
