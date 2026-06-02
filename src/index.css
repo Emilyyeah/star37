@@ -8,3 +8,14 @@ html, body {
 #root {
   height: 100%;
 }
+
+/* 手机预览框 — 内部所有层禁止显示滚动条 */
+.phone-shell-inner,
+.phone-shell-inner * {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE/Edge */
+}
+.phone-shell-inner::-webkit-scrollbar,
+.phone-shell-inner *::-webkit-scrollbar {
+  display: none;               /* Chrome/Safari */
+}

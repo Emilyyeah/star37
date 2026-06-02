@@ -23,6 +23,8 @@ export interface RecognitionRegion {
   matchedComponent: string
   confidence: number
   confirmed: boolean
+  /** 归一化坐标 [x, y, w, h]，值域 0~1，相对于图片宽高 */
+  bbox?: [number, number, number, number]
 }
 
 export interface MatchedComponent {

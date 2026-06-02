@@ -1,6 +1,6 @@
 import { Upload, Sparkles } from 'lucide-react'
 
-export function UploadPromptCard({ onUploadClick }: { onUploadClick: () => void }) {
+export function UploadPromptCard({ onUploadClick, onSelectTemplate }: { onUploadClick: () => void; onSelectTemplate?: () => void }) {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-md p-5 space-y-3">
       <div className="grid grid-cols-2 gap-3">
@@ -14,7 +14,7 @@ export function UploadPromptCard({ onUploadClick }: { onUploadClick: () => void 
             <p className="text-xs text-gray-500">AI 自动识别组件</p>
           </div>
         </button>
-        <button className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50/50 transition-all text-left">
+        <button onClick={onSelectTemplate} className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50/50 transition-all text-left">
           <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
             <Sparkles className="w-5 h-5 text-blue-500" />
           </div>

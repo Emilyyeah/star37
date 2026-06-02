@@ -1,6 +1,6 @@
 /* 底部输入框 */
 
-import { RefObject } from 'react'
+import type { RefObject } from 'react'
 import { Send, ImagePlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 

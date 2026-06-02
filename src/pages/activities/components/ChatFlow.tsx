@@ -1,6 +1,6 @@
 /* 对话流区域 */
 
-import { RefObject } from 'react'
+import type { RefObject } from 'react'
 import type { ChatMessage, RecognitionRegion } from '../types'
 import { MessageBubble } from './MessageBubble'
 
@@ -10,9 +10,12 @@ interface ChatFlowProps {
   onUploadClick: () => void
   onConfirmRegions: (regions: RecognitionRegion[]) => void
   onDropFiles: (files: FileList) => void
+  latestRegions?: RecognitionRegion[]
+  onItemsChange?: (regions: RecognitionRegion[]) => void
+  onSelectTemplate?: () => void
 }
 
-export function ChatFlow({ messages, messagesEndRef, onUploadClick, onConfirmRegions, onDropFiles }: ChatFlowProps) {
+export function ChatFlow({ messages, messagesEndRef, onUploadClick, onConfirmRegions, onDropFiles, latestRegions, onItemsChange, onSelectTemplate }: ChatFlowProps) {
   return (
     <div
       className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-6 space-y-5 min-w-0"
@@ -25,6 +28,9 @@ export function ChatFlow({ messages, messagesEndRef, onUploadClick, onConfirmReg
           message={msg}
           onUploadClick={onUploadClick}
           onConfirmRegions={onConfirmRegions}
+          latestRegions={latestRegions}
+          onItemsChange={onItemsChange}
+          onSelectTemplate={onSelectTemplate}
         />
       ))}
       <div ref={messagesEndRef} />

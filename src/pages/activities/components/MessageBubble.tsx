@@ -9,9 +9,12 @@ interface MessageBubbleProps {
   message: ChatMessage
   onUploadClick: () => void
   onConfirmRegions: (regions: RecognitionRegion[]) => void
+  latestRegions?: RecognitionRegion[]
+  onItemsChange?: (regions: RecognitionRegion[]) => void
+  onSelectTemplate?: () => void
 }
 
-export function MessageBubble({ message, onUploadClick, onConfirmRegions }: MessageBubbleProps) {
+export function MessageBubble({ message, onUploadClick, onConfirmRegions, latestRegions, onItemsChange, onSelectTemplate }: MessageBubbleProps) {
   const isAI = message.role === 'ai'
   return (
     <div className={cn('flex gap-3', !isAI && 'flex-row-reverse')}>
@@ -34,7 +37,7 @@ export function MessageBubble({ message, onUploadClick, onConfirmRegions }: Mess
         )}
         {message.card && (
           <div className="mt-2 w-full">
-            <CardRenderer card={message.card} onUploadClick={onUploadClick} onConfirmRegions={onConfirmRegions} />
+            <CardRenderer card={message.card} onUploadClick={onUploadClick} onConfirmRegions={onConfirmRegions} latestRegions={latestRegions} onItemsChange={onItemsChange} onSelectTemplate={onSelectTemplate} />
           </div>
         )}
       </div>

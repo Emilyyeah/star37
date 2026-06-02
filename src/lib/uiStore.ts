@@ -16,9 +16,9 @@ export const useUIStore = create<UIStore>((set) => ({
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
   sessionPanelCollapsed: false,
-  sessionPanelWidth: 220,
+  sessionPanelWidth: 320,
   toggleSessionPanel: () => set((s) => ({ sessionPanelCollapsed: !s.sessionPanelCollapsed })),
-  setSessionPanelWidth: (w: number) => set({ sessionPanelWidth: Math.max(160, Math.min(400, w)) }),
+  setSessionPanelWidth: (w: number) => set({ sessionPanelWidth: Math.max(200, Math.min(480, w)) }),
   resizeSessionPanel: (delta: number) =>
-    set((s) => ({ sessionPanelWidth: Math.max(160, Math.min(400, s.sessionPanelWidth + delta)) })),
+    set((s) => ({ sessionPanelWidth: Math.max(200, Math.min(480, s.sessionPanelWidth + delta)) })),
 }))

@@ -2,7 +2,10 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { ChatMessage, ConversationSession, RecognitionRegion, MatchedComponent } from '../types'
+import { useComponentStore } from '@/lib/componentStore'
+import type { CanvasItem } from '../hooks/useManualBuilder'
 import { mockRecognitionResults, regionsToComponents, mockAIReply } from './mockData'
+import type { MockTemplate } from '@/pages/templates/data/mockTemplates'
 
 export function useChat() {
   const [sessions, setSessions] = useState<ConversationSession[]>([
@@ -20,6 +23,61 @@ export function useChat() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; sessionId: string } | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [recognitionRegions, setRecognitionRegions] = useState<RecognitionRegion[]>([])
+  const [selectedCompIdx, setSelectedCompIdx] = useState<number | null>(null)
+
+  const getById = useComponentStore((s) => s.getById)
+
+  const NAME_TO_ID: Record<string, string> = {
+    '活动 Banner': 'comp-banner', '弹窗': 'comp-popup', '倒计时': 'comp-countdown',
+    '活动规则说明': 'comp-rules', '公告/跑马灯': 'comp-marquee', '转盘抽奖': 'comp-wheel',
+    '九宫格抽奖': 'comp-grid-lottery', '签到日历': 'comp-checkin',
+    '任务列表': 'comp-tasks', '排行榜': 'comp-leaderboard',
+  }
+
+  const toCanvasItems = (mcs: MatchedComponent[]): CanvasItem[] =>
+    mcs.map((mc, i) => {
+      const compId = NAME_TO_ID[mc.name] || 'comp-banner'
+      const def = getById(compId)
+      const params: Record<string, unknown> = {}
+      mc.params.forEach((p) => { params[p.name] = p.value })
+      return {
+        instanceId: mc.id + '-' + i,
+        componentId: compId,
+        name: mc.name,
+        emoji: def?.previewEmoji || '📦',
+        category: def?.category || 'display',
+        params,
+        schema: def?.parameterSchema || [],
+        variantId: def?.variants[0]?.id || '',
+      } satisfies CanvasItem
+    })
+
+  const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([])
+
+  // previewComponents 变化时重新生成 canvasItems（保留已有的 variantId 和 params 修改）
+  useEffect(() => {
+    setCanvasItems((prev) =>
+      toCanvasItems(previewComponents).map((item, i) => {
+        const existing = prev.find((p) => p.name === item.name)
+        return existing
+          ? { ...item, variantId: existing.variantId, params: { ...item.params, ...existing.params } }
+          : item
+      })
+    )
+  }, [previewComponents])
+
+  const updateCanvasParam = (idx: number, name: string, value: unknown) => {
+    setCanvasItems((prev) => prev.map((item, i) =>
+      i === idx ? { ...item, params: { ...item.params, [name]: value } } : item
+    ))
+  }
+
+  const updateCanvasVariant = (idx: number, variantId: string) => {
+    setCanvasItems((prev) => prev.map((item, i) =>
+      i === idx ? { ...item, variantId } : item
+    ))
+  }
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -70,6 +128,9 @@ export function useChat() {
 
       setTimeout(() => {
         setMessages((prev) => prev.filter((m) => m.card?.type !== 'recognition-loading'))
+        setRecognitionRegions(mockRecognitionResults)
+        // 识别完成后立刻推入预览，后续增删实时更新
+        setPreviewComponents(regionsToComponents(mockRecognitionResults.filter((r) => r.confirmed)))
         addMessage({ role: 'ai', content: '识别完成！检测到以下组件区域，请确认：' })
         addMessage({ role: 'ai', card: { type: 'recognition-result', regions: mockRecognitionResults } })
       }, 2500)
@@ -80,6 +141,32 @@ export function useChat() {
     },
     [addMessage]
   )
+
+  const handleSelectTemplate = useCallback((tpl: MockTemplate) => {
+    // 把模板组件名列表转成 RecognitionRegion 再转 MatchedComponent
+    const regions = tpl.components.map((c, i) => ({
+      id: `tpl-${i}`,
+      label: c.name,
+      matchedComponent: c.name,
+      confidence: 100,
+      confirmed: true,
+    }))
+    const components = regionsToComponents(regions)
+    setPreviewComponents(components)
+    setRecognitionRegions(regions)
+    setSessions((prev) =>
+      prev.map((s) => (s.active ? { ...s, title: tpl.name, updatedAt: Date.now() } : s))
+    )
+    addMessage({ role: 'user', content: `使用模板：${tpl.name}` })
+    setTimeout(() => {
+      addMessage({
+        role: 'ai',
+        content: `已加载「${tpl.name}」模板，包含 ${tpl.components.length} 个组件。
+
+组件已出现在右侧预览和组件配置中，你可以直接修改参数或继续对话调整。`,
+      })
+    }, 400)
+  }, [addMessage])
 
   const handleConfirmRegions = useCallback(
     (regions: RecognitionRegion[]) => {
@@ -111,6 +198,7 @@ export function useChat() {
     ])
     setShowPreview(true)
     setPreviewComponents([])
+    setRecognitionRegions([])
   }
 
   const handleDeleteSession = (id: string) => {
@@ -151,13 +239,14 @@ export function useChat() {
 
   return {
     // 状态
-    sessions, messages, input, showPreview, previewComponents,
+    sessions, messages, input, showPreview, previewComponents, recognitionRegions, setPreviewComponents,
+    selectedCompIdx, setSelectedCompIdx, canvasItems, updateCanvasParam, updateCanvasVariant,
     contextMenu, renamingId, renameValue,
     // refs
     messagesEndRef, inputRef, fileInputRef,
     // actions
     setInput, setShowPreview, setContextMenu, setRenameValue,
-    handleSend, handleFiles, handleConfirmRegions,
+    handleSend, handleFiles, handleConfirmRegions, handleSelectTemplate,
     handleNewSession, handleDeleteSession, handleStartRename, handleFinishRename,
     handleSwitchSession,
   }
