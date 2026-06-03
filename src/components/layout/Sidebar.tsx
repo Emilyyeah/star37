@@ -69,16 +69,12 @@ export function Sidebar() {
                 isActive
                   ? 'bg-orange-50 text-orange-600'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-                item.highlight && !isActive && 'text-orange-500 hover:text-orange-600'
               )}
             >
               <item.icon className="w-4 h-4 shrink-0" />
               {!collapsed && (
                 <>
                   <span className="text-xs">{item.label}</span>
-                  {item.highlight && (
-                    <span className="ml-auto w-1.5 h-1.5 rounded-full bg-orange-400" />
-                  )}
                 </>
               )}
             </button>

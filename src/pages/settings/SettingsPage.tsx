@@ -2,11 +2,9 @@
    Tab1: 项目管理  Tab2: 组件分类  Tab3: 模板分类 */
 
 import { useState, useEffect } from 'react'
-import { Settings, Plus, Pencil, Trash2, Check, X, ChevronDown } from 'lucide-react'
+import { Settings, Plus, Pencil, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
-import { CATEGORY_LABELS as COMP_CATEGORY_LABELS } from '@/types/component'
-import { CATEGORY_LABELS as TPL_CATEGORY_LABELS } from '@/pages/templates/data/mockTemplates'
 
 /* ══════════════════════════════════════
    类型定义
@@ -46,35 +44,20 @@ const INIT_PROJECTS: Project[] = [
   { id: 'p-003', name: '生存33天', gameId: 'survival-33', channel: 'miniapp', status: 'inactive', remark: '已停运', createdAt: '2025-06-01' },
 ]
 
-const INIT_COMP_CATS: Category[] = Object.entries(COMP_CATEGORY_LABELS).map(([id, label]) => ({
-  id, label, description: '', enabled: true,
-}))
+const INIT_COMP_CATS: Category[] = [
+  { id: 'lottery', label: '抽奖', description: '转盘、九宫格等抽奖类组件', enabled: true },
+  { id: 'task', label: '任务', description: '签到、任务列表等任务类组件', enabled: true },
+  { id: 'display', label: '展示', description: 'Banner、弹窗等展示类组件', enabled: true },
+  { id: 'exchange', label: '兑换', description: '积分兑换等兑换类组件', enabled: true },
+  { id: 'interaction', label: '互动', description: '排行榜等互动类组件', enabled: true },
+]
 
-const INIT_TPL_CATS: Category[] = Object.entries(TPL_CATEGORY_LABELS)
-  .filter(([id]) => id !== 'all')
-  .map(([id, label]) => ({ id, label, description: '', enabled: true }))
-
-/* ══════════════════════════════════════
-   通用：内联编辑行
-══════════════════════════════════════ */
-function EditableRow({
-  value, onSave, onCancel,
-}: { value: string; onSave: (v: string) => void; onCancel: () => void }) {
-  const [v, setV] = useState(value)
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        autoFocus
-        value={v}
-        onChange={(e) => setV(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') onSave(v); if (e.key === 'Escape') onCancel() }}
-        className="flex-1 text-sm border border-orange-400 rounded-lg px-2.5 py-1 focus:outline-none"
-      />
-      <button onClick={() => onSave(v)} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check className="w-4 h-4" /></button>
-      <button onClick={onCancel} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X className="w-4 h-4" /></button>
-    </div>
-  )
-}
+const INIT_TPL_CATS: Category[] = [
+  { id: 'lottery', label: '抽奖类', description: '转盘、九宫格等抽奖活动模板', enabled: true },
+  { id: 'checkin', label: '签到类', description: '签到打卡类活动模板', enabled: true },
+  { id: 'task', label: '任务类', description: '任务积分兑换类活动模板', enabled: true },
+  { id: 'welfare', label: '福利类', description: '节日福利、周年庆类活动模板', enabled: true },
+]
 
 /* ══════════════════════════════════════
    Tab 1：项目管理
