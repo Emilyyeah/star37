@@ -5,13 +5,15 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Send, Sparkles, User, Eye, PanelRightClose, PanelRightOpen, Smartphone, ImagePlus,
+  Send, Sparkles, User, Eye, PanelRightClose, PanelRightOpen, Smartphone, ImagePlus, X,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, showToast } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
 import { useComponentStore } from '@/lib/componentStore'
 import { SessionPanel } from '@/pages/activities/components/SessionPanel'
 import type { ConversationSession } from '@/pages/activities/types'
+
+const MAX_IMAGES = 5
 
 interface ChatMsg {
   id: string
@@ -67,6 +69,7 @@ export default function CreateComponentPage() {
   ])
   const [input, setInput] = useState('')
   const [showPreview, setShowPreview] = useState(true)
+  const [pastedImages, setPastedImages] = useState<{ file: File; url: string }[]>([])
   const [hasGenerated, setHasGenerated] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; sessionId: string } | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -83,6 +86,24 @@ export default function CreateComponentPage() {
   const addMessage = useCallback((msg: Omit<ChatMsg, 'id' | 'timestamp'>) => {
     setMessages((prev) => [...prev, { ...msg, id: String(Date.now() + Math.random()), timestamp: Date.now() }])
   }, [])
+
+  const handleSendWithImages = () => {
+    if (pastedImages.length > 0) {
+      // 把粘贴图片作为用户消息展示
+      setMessages((prev) => [...prev, {
+        id: String(Date.now()),
+        role: 'user',
+        content: `[上传了 ${pastedImages.length} 张参考截图]${input.trim() ? '\n' + input.trim() : ''}`,
+        timestamp: Date.now(),
+      }])
+      setPastedImages([])
+      setInput('')
+      if (inputRef.current) inputRef.current.style.height = 'auto'
+      setTimeout(() => setMessages((prev) => [...prev, { id: String(Date.now() + 1), role: 'ai', content: '收到截图！正在识别组件样式，请稍候...', timestamp: Date.now() }]), 400)
+      return
+    }
+    handleSend()
+  }
 
   const handleSend = () => {
     const trimmed = input.trim()
@@ -145,6 +166,46 @@ export default function CreateComponentPage() {
       setSessions((prev) => prev.map((s) => (s.id === renamingId ? { ...s, title: renameValue.trim() } : s)))
     }
     setRenamingId(null)
+  }
+
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = Array.from(e.clipboardData.items).filter((i) => i.type.startsWith('image/'))
+    if (!items.length) return
+    e.preventDefault()
+    const files = items.map((i) => i.getAsFile()).filter(Boolean) as File[]
+    setPastedImages((prev) => {
+      const remaining = MAX_IMAGES - prev.length
+      if (remaining <= 0) { showToast(`最多上传 ${MAX_IMAGES} 张截图`); return prev }
+      const toAdd = files.slice(0, remaining)
+      if (files.length > remaining) showToast(`已达上限，仅保留前 ${remaining} 张`)
+      return [...prev, ...toAdd.map((f) => ({ file: f, url: URL.createObjectURL(f) }))]
+    })
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: ClipboardEvent) => {
+      if (document.activeElement === inputRef.current) return
+      const items = Array.from(e.clipboardData?.items || []).filter((i) => i.type.startsWith('image/'))
+      if (!items.length) return
+      e.preventDefault()
+      const files = items.map((i) => i.getAsFile()).filter(Boolean) as File[]
+      setPastedImages((prev) => {
+        const remaining = MAX_IMAGES - prev.length
+        if (remaining <= 0) { showToast(`最多上传 ${MAX_IMAGES} 张截图`); return prev }
+        const toAdd = files.slice(0, remaining)
+        if (files.length > remaining) showToast(`已达上限，仅保留前 ${remaining} 张`)
+        return [...prev, ...toAdd.map((f) => ({ file: f, url: URL.createObjectURL(f) }))]
+      })
+    }
+    window.addEventListener('paste', handler)
+    return () => window.removeEventListener('paste', handler)
+  }, [inputRef])
+
+  const removeImage = (idx: number) => {
+    setPastedImages((prev) => {
+      URL.revokeObjectURL(prev[idx].url)
+      return prev.filter((_, i) => i !== idx)
+    })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -271,19 +332,48 @@ export default function CreateComponentPage() {
 
         {/* 底部输入框 */}
         <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-3">
-          <div className="flex items-end gap-3 bg-gray-50 rounded-2xl border border-gray-200 px-4 py-3 focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-500/10 transition-all">
-            <button onClick={() => fileInputRef.current?.click()} className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-orange-500 hover:bg-orange-50 transition-colors" title="上传参考截图">
-              <ImagePlus className="w-5 h-5" />
-            </button>
-            <textarea ref={inputRef} value={input} onChange={handleTextarea} onKeyDown={handleKeyDown}
-              placeholder={isVariantMode ? `描述「${variantForComp.name}」的新变体风格...` : '描述你需要的组件，如「转盘抽奖，6个奖品，支持每日限制」'}
-              rows={1} className="flex-1 resize-none bg-transparent text-sm leading-relaxed focus:outline-none placeholder:text-gray-400 py-1.5" />
-            <button onClick={handleSend} disabled={!input.trim()}
-              className={cn('shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors', input.trim() ? 'bg-orange-500 text-white hover:bg-orange-600' : 'text-gray-300')}>
-              <Send className="w-4 h-4" />
-            </button>
+          <div className={cn("flex flex-col bg-gray-50 rounded-2xl border transition-all", pastedImages.length > 0 ? "border-orange-400 ring-2 ring-orange-500/10" : "border-gray-200 focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-500/10")}>
+            {/* 粘贴图片预览 */}
+            {pastedImages.length > 0 && (
+              <div className="flex items-center gap-2 px-4 pt-3 flex-wrap">
+                {pastedImages.map((p, idx) => (
+                  <div key={idx} className="relative group shrink-0">
+                    <img src={p.url} alt={`截图 ${idx + 1}`} className="h-16 w-auto rounded-lg border border-gray-200 object-cover" />
+                    <button onClick={() => removeImage(idx)} className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-gray-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                ))}
+                <span className="text-xs text-gray-400 ml-1">{pastedImages.length} 张截图待发送</span>
+              </div>
+            )}
+            <div className="flex items-end gap-3 px-4 py-3">
+              <button onClick={() => fileInputRef.current?.click()} className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-orange-500 hover:bg-orange-50 transition-colors" title="上传参考截图（或 Ctrl+V 粘贴）">
+                <ImagePlus className="w-5 h-5" />
+              </button>
+              <textarea ref={inputRef} value={input} onChange={handleTextarea} onKeyDown={handleKeyDown} onPaste={handlePaste}
+                placeholder={pastedImages.length > 0 ? '添加描述（可选），按 Enter 发送截图...' : isVariantMode ? `描述「${variantForComp!.name}」的新变体风格...` : '描述你需要的组件，如「转盘抽奖，6个奖品，支持每日限制」'}
+                rows={1} className="flex-1 resize-none bg-transparent text-sm leading-relaxed focus:outline-none placeholder:text-gray-400 py-1.5" />
+              <button onClick={handleSendWithImages} disabled={!input.trim() && pastedImages.length === 0}
+                className={cn('shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors', (input.trim() || pastedImages.length > 0) ? 'bg-orange-500 text-white hover:bg-orange-600' : 'text-gray-300')}>
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-          <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple className="hidden" onChange={(e) => { e.target.value = '' }} />
+          <p className="text-xs text-gray-400 mt-1.5 text-center">
+            最多 {MAX_IMAGES} 张 · 支持拖拽 / 点击上传 / <kbd className="px-1 py-0.5 bg-gray-100 rounded text-gray-500 text-[10px]">Ctrl+V</kbd> 粘贴截图
+          </p>
+          <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple className="hidden"
+            onChange={(e) => {
+              if (!e.target.files) return
+              const files = Array.from(e.target.files)
+              const remaining = MAX_IMAGES - pastedImages.length
+              if (remaining <= 0) { showToast(`最多上传 ${MAX_IMAGES} 张截图`); e.target.value = ''; return }
+              const toSend = files.slice(0, remaining)
+              if (files.length > remaining) showToast(`已达上限，仅保留前 ${remaining} 张`)
+              setPastedImages((prev) => [...prev, ...toSend.map((f) => ({ file: f, url: URL.createObjectURL(f) }))])
+              e.target.value = ''
+            }} />
         </div>
       </div>
     </div>

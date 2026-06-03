@@ -10,13 +10,13 @@ import {
   LayoutTemplate,
   BarChart3,
   Settings,
-  PanelLeftClose,
-  PanelLeftOpen,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 
 const navItems = [
   { path: '/', label: '工作台', icon: LayoutDashboard },
-  { path: '/activities/create', label: '创建活动', icon: Sparkles, highlight: true },
+  { path: "/activities/create", label: "创建活动", icon: Sparkles },
   { path: '/activities', label: '活动管理', icon: FolderOpen },
   { path: '/components', label: '组件库', icon: Puzzle },
   { path: '/templates', label: '模板库', icon: LayoutTemplate },
@@ -40,40 +40,24 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'bg-white border-r border-gray-200 flex flex-col shrink-0 transition-all duration-200',
-        collapsed ? 'w-14' : 'w-36'
+        'bg-white border-r border-gray-200 flex flex-col shrink-0 transition-all duration-200 relative',
+        collapsed ? 'w-14' : 'w-44'
       )}
     >
-      {/* Logo */}
-      <div className="h-10 flex items-center justify-between px-3 border-b border-gray-200">
-        {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-orange-500 flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="font-semibold text-xs text-gray-900">AI 活动系统</span>
-          </div>
-        )}
-        <button
-          onClick={toggleSidebar}
-          className={cn(
-            'p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors',
-            collapsed && 'mx-auto'
-          )}
-        >
-          {collapsed ? (
-            <PanelLeftOpen className="w-4 h-4" />
-          ) : (
-            <PanelLeftClose className="w-4 h-4" />
-          )}
-        </button>
+      {/* Logo — 居中 */}
+      <div className="h-12 flex items-center justify-center border-b border-gray-200 shrink-0">
+        <img
+          src={`${import.meta.env.BASE_URL}logo.png`}
+          alt="37手游"
+          className="object-contain"
+          style={{ height: collapsed ? 22 : 26, width: 'auto', maxWidth: collapsed ? 36 : '80%' }}
+        />
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 py-2 px-2 space-y-0.5">
         {navItems.map((item) => {
           const isActive = activePath === item.path
-
           return (
             <button
               key={item.path}
@@ -108,6 +92,22 @@ export function Sidebar() {
           <p className="text-xs text-gray-400">v0.1.0</p>
         </div>
       )}
+
+      {/* 收起/展开按钮 — 浮在右边缘垂直居中，胶囊形 */}
+      <button
+        onClick={toggleSidebar}
+        className={cn(
+          'absolute top-1/2 -translate-y-1/2 -right-3 z-10',
+          'w-6 h-10 flex items-center justify-center',
+          'bg-white border border-gray-200 rounded-r-full shadow-sm',
+          'text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors'
+        )}
+      >
+        {collapsed
+          ? <ChevronRight className="w-3.5 h-3.5" />
+          : <ChevronLeft className="w-3.5 h-3.5" />
+        }
+      </button>
     </aside>
   )
 }

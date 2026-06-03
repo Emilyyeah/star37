@@ -19,3 +19,19 @@ html, body {
 .phone-shell-inner *::-webkit-scrollbar {
   display: none;               /* Chrome/Safari */
 }
+
+/* 设置页表单输入 */
+.field-input {
+  width: 100%;
+  font-size: 0.875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+  background: white;
+  transition: border-color 0.15s;
+}
+.field-input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249,115,22,0.1);
+}

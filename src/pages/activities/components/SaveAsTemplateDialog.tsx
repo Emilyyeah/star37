@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, LayoutTemplate, ChevronDown, Check } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, showToast } from '@/lib/utils'
 import { MOCK_TEMPLATES, type MockTemplate, type TemplateCategory } from '@/pages/templates/data/mockTemplates'
 
 const CATEGORY_OPTIONS: { value: Exclude<TemplateCategory, 'all'>; label: string }[] = [
@@ -19,21 +19,6 @@ function guessCategory(componentNames: string[]): Exclude<TemplateCategory, 'all
   if (joined.includes('签到')) return 'checkin'
   if (joined.includes('任务') || joined.includes('邀请')) return 'task'
   return 'welfare'
-}
-
-/** 简易 toast — 挂到 body */
-function showToast(msg: string) {
-  const el = document.createElement('div')
-  el.textContent = msg
-  el.style.cssText = [
-    'position:fixed', 'bottom:32px', 'left:50%', 'transform:translateX(-50%)',
-    'background:#1a1a1a', 'color:#fff', 'padding:10px 20px',
-    'border-radius:10px', 'font-size:13px', 'z-index:9999',
-    'pointer-events:none', 'white-space:nowrap',
-    'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
-  ].join(';')
-  document.body.appendChild(el)
-  setTimeout(() => el.remove(), 2500)
 }
 
 export interface SaveAsTemplateDialogProps {
