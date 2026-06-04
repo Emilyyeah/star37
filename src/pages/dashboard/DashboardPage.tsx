@@ -101,31 +101,39 @@ function TrendChart() {
   const lastM = curMonth === 1 ? 12 : curMonth - 1
   const lastMCount = ACTIVITIES.filter((a) => inMonth(a, year === 2026 && curMonth === 1 ? year - 1 : year, lastM)).length
 
-  // SVG 折线图参数
-  const W = 600, H = 80, PAD_L = 8, PAD_R = 8, PAD_T = 8, PAD_B = 4
+  // 图表参数 — 柱状图 + 折线组合
+  const W = 600
+  const H = 160                         // 高度加到 160（原80的2倍）
+  const PAD_L = 28                      // 左留 Y 轴标签空间
+  const PAD_R = 12
+  const PAD_T = 20                      // 顶部留数值标注空间
+  const PAD_B = 16
   const chartW = W - PAD_L - PAD_R
   const chartH = H - PAD_T - PAD_B
-  const max = Math.max(...monthTotals, 1)
+  const max = Math.max(...monthTotals, 3)  // 最少展示到3，防止全0挤在底部
+  const barW = chartW / months.length * 0.45  // 柱宽
 
+  const barX = (i: number) => PAD_L + (i + 0.5) / months.length * chartW - barW / 2
+  const barY = (v: number) => PAD_T + chartH - (v / max) * chartH
+  const barH = (v: number) => (v / max) * chartH
+
+  // 折线点（柱顶中心）
   const pts = monthTotals.map((v, i) => ({
-    x: PAD_L + (i / (months.length - 1)) * chartW,
-    y: PAD_T + chartH - (v / max) * chartH,
+    x: PAD_L + (i + 0.5) / months.length * chartW,
+    y: barY(v),
     v,
   }))
-
   const polyline = pts.map((p) => `${p.x},${p.y}`).join(' ')
 
-  // 渐变填充路径
-  const area = [
-    `M${pts[0].x},${PAD_T + chartH}`,
-    ...pts.map((p) => `L${p.x},${p.y}`),
-    `L${pts[pts.length - 1].x},${PAD_T + chartH}`,
-    'Z',
-  ].join(' ')
+  // Y 轴刻度
+  const yTicks = [0, Math.round(max / 2), max]
+
+  // Q1/Q2 分割 X
+  const qDivX = PAD_L + (3 / months.length) * chartW
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 px-6 py-5">
-      {/* 头部：季度汇总数字 */}
+      {/* 头部 */}
       <div className="flex items-start justify-between mb-4">
         <div>
           <p className="text-sm font-semibold text-gray-800 mb-0.5">活动趋势</p>
@@ -145,55 +153,85 @@ function TrendChart() {
         </div>
       </div>
 
-      {/* 折线图 */}
+      {/* 柱状图 + 折线 */}
       <div className="relative">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 80 }}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 160 }}>
           <defs>
-            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f97316" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+            <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f97316" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#f97316" stopOpacity="0.3" />
             </linearGradient>
           </defs>
-          {/* 面积填充 */}
-          <path d={area} fill="url(#areaGrad)" />
-          {/* 折线 */}
-          <polyline points={polyline} fill="none" stroke="#f97316" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-          {/* 数据点 + 数值标注 */}
-          {pts.map((p, i) => (
-            <g key={i}>
-              <circle cx={p.x} cy={p.y} r="3" fill="#f97316" stroke="white" strokeWidth="1.5" />
-              {p.v > 0 && (
-                <text x={p.x} y={p.y - 7} textAnchor="middle" fontSize="10" fill="#f97316" fontWeight="600">
-                  {p.v}
-                </text>
-              )}
-            </g>
-          ))}
-          {/* Q1/Q2 分割线 */}
-          {(() => {
-            const qx = PAD_L + (2.5 / (months.length - 1)) * chartW
-            return <line x1={qx} y1={PAD_T} x2={qx} y2={PAD_T + chartH} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="3,3" />
-          })()}
-        </svg>
 
-        {/* X 轴标签 */}
-        <div className="flex justify-between mt-1 px-1">
+          {/* Y 轴刻度线 + 数值 */}
+          {yTicks.map((v) => {
+            const y = PAD_T + chartH - (v / max) * chartH
+            return (
+              <g key={v}>
+                <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="#f3f4f6" strokeWidth="1" />
+                <text x={PAD_L - 4} y={y + 3} textAnchor="end" fontSize="9" fill="#9ca3af">{v}</text>
+              </g>
+            )
+          })}
+
+          {/* Q1/Q2 分割虚线 */}
+          <line x1={qDivX} y1={PAD_T} x2={qDivX} y2={PAD_T + chartH} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4,3" />
+          <text x={qDivX - 4} y={PAD_T - 6} textAnchor="end" fontSize="9" fill="#d1d5db">Q1</text>
+          <text x={qDivX + 4} y={PAD_T - 6} textAnchor="start" fontSize="9" fill="#d1d5db">Q2</text>
+
+          {/* 柱状图 */}
+          {monthTotals.map((v, i) => {
+            const x = barX(i)
+            const y = barY(v)
+            const h = barH(v)
+            const isFuture = i + 1 > curMonth
+            return (
+              <rect key={i} x={x} y={y} width={barW} height={h}
+                fill={isFuture ? '#f3f4f6' : 'url(#barGrad)'}
+                rx="3" ry="3"
+              />
+            )
+          })}
+
+          {/* 折线（覆盖在柱上） */}
+          <polyline points={polyline} fill="none" stroke="#f97316" strokeWidth="2"
+            strokeLinejoin="round" strokeLinecap="round" />
+
+          {/* 折线数据点 + 数值标注 */}
+          {pts.map((p, i) => {
+            const isFuture = i + 1 > curMonth
+            return (
+              <g key={i}>
+                <circle cx={p.x} cy={p.y} r="3.5"
+                  fill={isFuture ? '#e5e7eb' : '#f97316'}
+                  stroke="white" strokeWidth="1.5" />
+                {p.v > 0 && (
+                  <text x={p.x} y={p.y - 8} textAnchor="middle" fontSize="10"
+                    fill={isFuture ? '#9ca3af' : '#f97316'} fontWeight="600">
+                    {p.v}
+                  </text>
+                )}
+              </g>
+            )
+          })}
+
+          {/* X 轴底线 */}
+          <line x1={PAD_L} y1={PAD_T + chartH} x2={W - PAD_R} y2={PAD_T + chartH} stroke="#e5e7eb" strokeWidth="1" />
+
+          {/* X 轴月份标签（SVG内） */}
           {monthLabels.map((l, i) => (
-            <span key={i} className={cn('text-[11px]', i + 1 <= curMonth ? 'text-gray-500' : 'text-gray-300')}>
+            <text
+              key={i}
+              x={PAD_L + (i + 0.5) / months.length * chartW}
+              y={PAD_T + chartH + 12}
+              textAnchor="middle"
+              fontSize="10"
+              fill={i + 1 <= curMonth ? '#6b7280' : '#d1d5db'}
+            >
               {l}
-            </span>
+            </text>
           ))}
-        </div>
-
-        {/* Q 标注 */}
-        <div className="absolute top-0 left-0 right-0 flex pointer-events-none">
-          <div className="flex-1 flex justify-center">
-            <span className="text-[10px] text-gray-300 bg-white px-1">Q1</span>
-          </div>
-          <div className="flex-1 flex justify-center">
-            <span className="text-[10px] text-gray-300 bg-white px-1">Q2</span>
-          </div>
-        </div>
+        </svg>
       </div>
     </div>
   )
