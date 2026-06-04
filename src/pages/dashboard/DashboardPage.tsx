@@ -1,178 +1,432 @@
-/* 工作台 — 概览统计 + 最近活动 + 快捷入口 */
+/* 工作台 */
 
-import { useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Sparkles, Puzzle, FolderOpen, LayoutTemplate,
-  Plus, ArrowRight, TrendingUp, CheckCircle2, Clock, FileEdit,
+  LayoutDashboard, CheckCircle2, AlertTriangle, ArrowRight, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
 
-/* ── Mock 数据 ── */
-const STATS = [
-  { label: '活动总数', value: 9, sub: '较上月 +2', trend: 'up', icon: FolderOpen, accent: 'text-blue-600', bg: 'bg-blue-50' },
-  { label: '进行中', value: 2, sub: '本月活跃', trend: 'up', icon: TrendingUp, accent: 'text-green-600', bg: 'bg-green-50' },
-  { label: '组件库', value: 10, sub: '已上线组件', trend: 'neutral', icon: Puzzle, accent: 'text-purple-600', bg: 'bg-purple-50' },
-  { label: '模板数量', value: 6, sub: '可直接使用', trend: 'neutral', icon: LayoutTemplate, accent: 'text-orange-600', bg: 'bg-orange-50' },
-]
+/* ══════════════════════════════════════
+   Mock 数据
+══════════════════════════════════════ */
 
-type ActivityStatus = 'running' | 'ended' | 'draft'
-const STATUS_MAP: Record<ActivityStatus, { label: string; icon: React.ElementType; cls: string }> = {
-  running: { label: '进行中', icon: CheckCircle2, cls: 'text-green-600' },
-  ended:   { label: '已结束', icon: Clock, cls: 'text-gray-400' },
-  draft:   { label: '草稿', icon: FileEdit, cls: 'text-orange-500' },
+type ActivityStatus = 'draft' | 'running' | 'ended'
+
+interface DashActivity {
+  id: string; name: string; gameProject: string; gameName: string
+  status: ActivityStatus; startTime: string; endTime: string; creator: string
 }
 
-const RECENT_ACTIVITIES = [
-  { id: 'act-009', name: '暑期狂欢节', game: '斗罗3D', status: 'draft' as ActivityStatus, updatedAt: '今天 10:00', components: 0 },
-  { id: 'act-008', name: '端午龙舟赛', game: '斗罗MMO', status: 'draft' as ActivityStatus, updatedAt: '昨天 09:00', components: 4 },
-  { id: 'act-001', name: '618 大转盘抽奖', game: '斗罗3D', status: 'running' as ActivityStatus, updatedAt: '2026-06-01', components: 5 },
-  { id: 'act-002', name: '新服签到福利', game: '斗罗MMO', status: 'running' as ActivityStatus, updatedAt: '2026-05-18', components: 3 },
-  { id: 'act-005', name: '夏日冲浪季', game: '生存33天', status: 'draft' as ActivityStatus, updatedAt: '2026-05-30', components: 2 },
+const ACTIVITIES: DashActivity[] = [
+  { id: 'act-001', name: '618 大转盘抽奖',  gameProject: 'dl3d',  gameName: '斗罗大陆3D',  status: 'running', startTime: '2026-06-01', endTime: '2026-06-08', creator: '艾米莉' },
+  { id: 'act-009', name: '暑期狂欢节',      gameProject: 'dl3d',  gameName: '斗罗大陆3D',  status: 'draft',   startTime: '2026-07-01', endTime: '2026-07-31', creator: '艾米莉' },
+  { id: 'act-007', name: '清明踏青活动',    gameProject: 'dl3d',  gameName: '斗罗大陆3D',  status: 'ended',   startTime: '2026-04-04', endTime: '2026-04-06', creator: '小李' },
+  { id: 'act-012', name: '元旦签到活动',    gameProject: 'dl3d',  gameName: '斗罗大陆3D',  status: 'ended',   startTime: '2026-01-01', endTime: '2026-01-07', creator: '小李' },
+  { id: 'act-013', name: '春节大礼包',      gameProject: 'dl3d',  gameName: '斗罗大陆3D',  status: 'ended',   startTime: '2026-02-01', endTime: '2026-02-14', creator: '艾米莉' },
+  { id: 'act-002', name: '新服签到福利',    gameProject: 'dlmmo', gameName: '斗罗大陆MMO', status: 'running', startTime: '2026-05-20', endTime: '2026-06-18', creator: '小王' },
+  { id: 'act-008', name: '端午龙舟赛',      gameProject: 'dlmmo', gameName: '斗罗大陆MMO', status: 'draft',   startTime: '2026-06-25', endTime: '2026-06-28', creator: '艾米莉' },
+  { id: 'act-014', name: '情人节活动',      gameProject: 'dlmmo', gameName: '斗罗大陆MMO', status: 'ended',   startTime: '2026-02-14', endTime: '2026-02-20', creator: '小王' },
+  { id: 'act-003', name: '五一劳动节活动',  gameProject: 'frxxt', gameName: '凡人修仙传',  status: 'ended',   startTime: '2026-05-01', endTime: '2026-05-07', creator: '艾米莉' },
+  { id: 'act-011', name: '新手引导活动',    gameProject: 'frxxt', gameName: '凡人修仙传',  status: 'running', startTime: '2026-06-01', endTime: '2026-06-30', creator: '小李' },
+  { id: 'act-015', name: '开服庆典',        gameProject: 'frxxt', gameName: '凡人修仙传',  status: 'ended',   startTime: '2026-03-15', endTime: '2026-03-20', creator: '小李' },
+  { id: 'act-005', name: '夏日冲浪季',      gameProject: 'sc33',  gameName: '生存33天',    status: 'draft',   startTime: '2026-07-01', endTime: '2026-07-31', creator: '艾米莉' },
+  { id: 'act-010', name: '夏季登录奖励',    gameProject: 'sc33',  gameName: '生存33天',    status: 'running', startTime: '2026-06-01', endTime: '2026-06-07', creator: '小王' },
+  { id: 'act-006', name: '邀请好友赢大奖',  gameProject: 'zmsl',  gameName: '织梦森林',    status: 'ended',   startTime: '2026-03-01', endTime: '2026-03-31', creator: '小王' },
+  { id: 'act-016', name: '织梦周年庆',      gameProject: 'zmsl',  gameName: '织梦森林',    status: 'ended',   startTime: '2026-05-10', endTime: '2026-05-20', creator: '艾米莉' },
+  { id: 'act-004', name: '周年庆典大回馈',  gameProject: 'xxyg',  gameName: '小小蚁国',    status: 'ended',   startTime: '2026-04-15', endTime: '2026-04-30', creator: '小李' },
+  { id: 'act-017', name: '蚁国春节活动',    gameProject: 'xxyg',  gameName: '小小蚁国',    status: 'ended',   startTime: '2026-01-28', endTime: '2026-02-10', creator: '小李' },
 ]
 
-const QUICK_ACTIONS = [
-  { label: '创建活动', desc: '上传设计稿，AI 识别生成', path: '/activities/create', tabLabel: '创建活动', icon: Plus, highlight: true },
-  { label: '活动管理', desc: '查看所有活动列表', path: '/activities', tabLabel: '活动管理', icon: FolderOpen, highlight: false },
-  { label: '组件库', desc: '管理可复用组件', path: '/components', tabLabel: '组件库', icon: Puzzle, highlight: false },
-  { label: '模板库', desc: '浏览并使用模板', path: '/templates', tabLabel: '模板库', icon: LayoutTemplate, highlight: false },
+const GAMES = [
+  { key: 'dl3d',  name: '斗罗大陆3D',  color: '#f97316' },
+  { key: 'dlmmo', name: '斗罗大陆MMO', color: '#3b82f6' },
+  { key: 'frxxt', name: '凡人修仙传',  color: '#10b981' },
+  { key: 'sc33',  name: '生存33天',    color: '#a855f7' },
+  { key: 'zmsl',  name: '织梦森林',    color: '#f59e0b' },
+  { key: 'xxyg',  name: '小小蚁国',    color: '#ef4444' },
 ]
 
-/* ── 组件 ── */
-export default function DashboardPage() {
+/* ══════════════════════════════════════
+   工具函数
+══════════════════════════════════════ */
+
+function daysFromToday(dateStr: string): number {
+  if (!dateStr) return Infinity
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const target = new Date(dateStr); target.setHours(0, 0, 0, 0)
+  return Math.round((target.getTime() - today.getTime()) / 86400000)
+}
+
+function isExpiringSoon(act: DashActivity) {
+  if (act.status !== 'running') return false
+  const d = daysFromToday(act.endTime)
+  return d >= 0 && d <= 7
+}
+
+function remainText(endTime: string) {
+  const d = daysFromToday(endTime)
+  if (d < 0)   return { text: '已过期',   urgent: true }
+  if (d === 0) return { text: '今天到期', urgent: true }
+  if (d === 1) return { text: '明天到期', urgent: true }
+  return { text: `${d} 天后`, urgent: false }
+}
+
+function inMonth(act: DashActivity, year: number, month: number) {
+  if (!act.startTime) return false
+  const d = new Date(act.startTime)
+  return d.getFullYear() === year && d.getMonth() + 1 === month
+}
+
+/* ══════════════════════════════════════
+   顶部：折线图趋势（按月，纯 SVG）
+══════════════════════════════════════ */
+
+function TrendChart() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const curMonth = now.getMonth() + 1
+
+  // 月度数据（1-6月）
+  const months = [1, 2, 3, 4, 5, 6]
+  const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月']
+
+  // 每月按游戏统计
+  const monthTotals = months.map((m) => ACTIVITIES.filter((a) => inMonth(a, year, m)).length)
+
+  // 季度汇总
+  const q1 = months.slice(0, 3).reduce((s, m) => s + ACTIVITIES.filter((a) => inMonth(a, year, m)).length, 0)
+  const q2 = months.slice(3, 6).reduce((s, m) => s + ACTIVITIES.filter((a) => inMonth(a, year, m)).length, 0)
+  const lastM = curMonth === 1 ? 12 : curMonth - 1
+  const lastMCount = ACTIVITIES.filter((a) => inMonth(a, year === 2026 && curMonth === 1 ? year - 1 : year, lastM)).length
+
+  // SVG 折线图参数
+  const W = 600, H = 80, PAD_L = 8, PAD_R = 8, PAD_T = 8, PAD_B = 4
+  const chartW = W - PAD_L - PAD_R
+  const chartH = H - PAD_T - PAD_B
+  const max = Math.max(...monthTotals, 1)
+
+  const pts = monthTotals.map((v, i) => ({
+    x: PAD_L + (i / (months.length - 1)) * chartW,
+    y: PAD_T + chartH - (v / max) * chartH,
+    v,
+  }))
+
+  const polyline = pts.map((p) => `${p.x},${p.y}`).join(' ')
+
+  // 渐变填充路径
+  const area = [
+    `M${pts[0].x},${PAD_T + chartH}`,
+    ...pts.map((p) => `L${p.x},${p.y}`),
+    `L${pts[pts.length - 1].x},${PAD_T + chartH}`,
+    'Z',
+  ].join(' ')
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 px-6 py-5">
+      {/* 头部：季度汇总数字 */}
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <p className="text-sm font-semibold text-gray-800 mb-0.5">活动趋势</p>
+          <p className="text-xs text-gray-400">{year}年 按月统计</p>
+        </div>
+        <div className="flex items-center gap-6">
+          {[
+            { label: 'Q1（1-3月）', value: q1 },
+            { label: 'Q2（4-6月）', value: q2 },
+            { label: `上月（${lastM}月）`, value: lastMCount },
+          ].map((s) => (
+            <div key={s.label} className="text-right">
+              <p className="text-xl font-bold text-gray-900 leading-none">{s.value}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 折线图 */}
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 80 }}>
+          <defs>
+            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f97316" stopOpacity="0.15" />
+              <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {/* 面积填充 */}
+          <path d={area} fill="url(#areaGrad)" />
+          {/* 折线 */}
+          <polyline points={polyline} fill="none" stroke="#f97316" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+          {/* 数据点 + 数值标注 */}
+          {pts.map((p, i) => (
+            <g key={i}>
+              <circle cx={p.x} cy={p.y} r="3" fill="#f97316" stroke="white" strokeWidth="1.5" />
+              {p.v > 0 && (
+                <text x={p.x} y={p.y - 7} textAnchor="middle" fontSize="10" fill="#f97316" fontWeight="600">
+                  {p.v}
+                </text>
+              )}
+            </g>
+          ))}
+          {/* Q1/Q2 分割线 */}
+          {(() => {
+            const qx = PAD_L + (2.5 / (months.length - 1)) * chartW
+            return <line x1={qx} y1={PAD_T} x2={qx} y2={PAD_T + chartH} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="3,3" />
+          })()}
+        </svg>
+
+        {/* X 轴标签 */}
+        <div className="flex justify-between mt-1 px-1">
+          {monthLabels.map((l, i) => (
+            <span key={i} className={cn('text-[11px]', i + 1 <= curMonth ? 'text-gray-500' : 'text-gray-300')}>
+              {l}
+            </span>
+          ))}
+        </div>
+
+        {/* Q 标注 */}
+        <div className="absolute top-0 left-0 right-0 flex pointer-events-none">
+          <div className="flex-1 flex justify-center">
+            <span className="text-[10px] text-gray-300 bg-white px-1">Q1</span>
+          </div>
+          <div className="flex-1 flex justify-center">
+            <span className="text-[10px] text-gray-300 bg-white px-1">Q2</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════
+   共用：按游戏分组活动列表
+══════════════════════════════════════ */
+
+function GameGroup({
+  game, list, urgentColor = false,
+  onClickAct,
+}: {
+  game: { key: string; name: string; color: string }
+  list: DashActivity[]
+  urgentColor?: boolean
+  onClickAct: (act: DashActivity) => void
+}) {
+  return (
+    <div>
+      {/* 游戏名行 */}
+      <div className="flex items-center gap-2.5 px-4 pt-3 pb-1.5">
+        <div className="w-2.5 h-2.5 rounded-full shrink-0 border-2 border-white shadow-sm" style={{ backgroundColor: game.color }} />
+        <span className="text-xs font-semibold text-gray-700">{game.name}</span>
+        <span className="text-[11px] text-gray-400 font-normal">{list.length} 个活动</span>
+      </div>
+      {/* 活动行 — 缩进竖线 */}
+      <div className="ml-4 mb-2 pl-3.5 border-l-2 border-gray-100">
+        {list.map((act) => {
+          const { text, urgent } = remainText(act.endTime)
+          return (
+            <div
+              key={act.id}
+              onClick={() => onClickAct(act)}
+              className={cn(
+                'flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors group',
+                urgent ? 'hover:bg-red-50' : 'hover:bg-gray-50'
+              )}
+            >
+              {urgent && <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />}
+              <span className={cn('flex-1 text-sm truncate', urgent ? 'text-red-700 font-medium' : 'text-gray-700')}>
+                {act.name}
+              </span>
+              <span className="text-xs text-gray-400 shrink-0">{act.endTime}</span>
+              <span className={cn('text-xs font-medium shrink-0 w-14 text-right',
+                urgent ? 'text-red-600' : urgentColor ? 'text-orange-500' : 'text-gray-400'
+              )}>
+                {text}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════
+   下方左：进行中活动
+══════════════════════════════════════ */
+
+function RunningPanel() {
   const navigate = useNavigate()
   const openTab = useTabStore((s) => s.openTab)
 
-  useEffect(() => { openTab('/', '工作台') }, [openTab])
+  const byGame = useMemo(() =>
+    GAMES.map((g) => ({
+      game: g,
+      list: ACTIVITIES.filter((a) => a.status === 'running' && a.gameProject === g.key)
+        .sort((a, b) => daysFromToday(a.endTime) - daysFromToday(b.endTime)),
+    })).filter((g) => g.list.length > 0),
+  [])
 
-  const go = (path: string, label: string) => {
-    openTab(path, label)
-    navigate(path)
-  }
+  const total = byGame.reduce((s, g) => s + g.list.length, 0)
+  const goAct = (act: DashActivity) => { openTab(`/activities/${act.id}`, act.name); navigate(`/activities/${act.id}`) }
 
   return (
-    <div className="space-y-6">
+    <div className="bg-white rounded-2xl border border-gray-200 flex flex-col min-h-0">
+      <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100 shrink-0">
+        <CheckCircle2 className="w-4 h-4 text-green-500" />
+        <h2 className="text-sm font-semibold text-gray-800">进行中活动</h2>
+        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">{total}</span>
+      </div>
+      <div className="flex-1 overflow-auto">
+        {byGame.length === 0
+          ? <div className="flex items-center justify-center h-24 text-sm text-gray-400">暂无进行中的活动</div>
+          : byGame.map(({ game, list }) => <GameGroup key={game.key} game={game} list={list} onClickAct={goAct} />)
+        }
+      </div>
+    </div>
+  )
+}
+/* ══════════════════════════════════════
+   下方右：即将到期
+══════════════════════════════════════ */
 
+function ExpiringPanel() {
+  const navigate = useNavigate()
+  const openTab = useTabStore((s) => s.openTab)
+
+  const byGame = useMemo(() =>
+    GAMES.map((g) => ({
+      game: g,
+      list: ACTIVITIES.filter((a) => isExpiringSoon(a) && a.gameProject === g.key)
+        .sort((a, b) => daysFromToday(a.endTime) - daysFromToday(b.endTime)),
+    })).filter((g) => g.list.length > 0),
+  [])
+
+  const total = byGame.reduce((s, g) => s + g.list.length, 0)
+  const goAct = (act: DashActivity) => { openTab(`/activities/${act.id}`, act.name); navigate(`/activities/${act.id}`) }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 flex flex-col min-h-0">
+      <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100 shrink-0">
+        <AlertTriangle className="w-4 h-4 text-red-500" />
+        <h2 className="text-sm font-semibold text-gray-800">即将到期</h2>
+        <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-medium">{total}</span>
+        <span className="text-xs text-gray-400 ml-auto">7天内结束</span>
+      </div>
+      <div className="flex-1 overflow-auto">
+        {byGame.length === 0
+          ? <div className="flex items-center justify-center h-24 text-sm text-gray-400">本周无即将到期的活动</div>
+          : byGame.map(({ game, list }) => <GameGroup key={game.key} game={game} list={list} urgentColor onClickAct={goAct} />)
+        }
+      </div>
+    </div>
+  )
+}
+/* ══════════════════════════════════════
+   下方右：游戏活动量排行
+══════════════════════════════════════ */
+
+const RANK_DATA: Record<string, Record<string, number>> = {
+  today:     { dl3d: 3, dlmmo: 2, frxxt: 1, sc33: 2, zmsl: 0, xxyg: 1 },
+  yesterday: { dl3d: 5, dlmmo: 3, frxxt: 2, sc33: 1, zmsl: 1, xxyg: 0 },
+  week7:     { dl3d: 18, dlmmo: 12, frxxt: 8, sc33: 10, zmsl: 4, xxyg: 3 },
+  month30:   { dl3d: 62, dlmmo: 45, frxxt: 31, sc33: 38, zmsl: 14, xxyg: 11 },
+}
+
+const RANK_TABS = [
+  { key: 'today',     label: '今日' },
+  { key: 'yesterday', label: '昨日' },
+  { key: 'week7',     label: '近7天' },
+  { key: 'month30',   label: '近30天' },
+]
+
+function RankPanel() {
+  const [tab, setTab] = useState('today')
+
+  const ranked = useMemo(() => {
+    const data = RANK_DATA[tab] || {}
+    return [...GAMES]
+      .map((g) => ({ ...g, count: data[g.key] || 0 }))
+      .sort((a, b) => b.count - a.count)
+  }, [tab])
+
+  const max = ranked[0]?.count || 1
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 flex flex-col min-h-0">
+      <div className="px-5 py-3.5 border-b border-gray-100 shrink-0">
+        <h2 className="text-sm font-semibold text-gray-800 mb-3">游戏活动量排行</h2>
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+          {RANK_TABS.map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={cn('flex-1 py-1 text-xs font-medium rounded-md transition-colors',
+                tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              )}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto px-5 py-4 space-y-3.5">
+        {ranked.map((g, idx) => (
+          <div key={g.key} className="flex items-center gap-3">
+            <span className={cn(
+              'w-5 h-5 rounded flex items-center justify-center text-xs font-bold shrink-0',
+              idx === 0 ? 'bg-orange-500 text-white' :
+              idx === 1 ? 'bg-gray-300 text-gray-700' :
+              idx === 2 ? 'bg-amber-600 text-white' : 'text-gray-400'
+            )}>
+              {idx + 1}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-gray-700 truncate">{g.name}</span>
+                <span className="text-xs font-semibold text-gray-800 ml-2 shrink-0">{g.count}</span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: max > 0 ? `${(g.count / max) * 100}%` : '0%',
+                    backgroundColor: g.color,
+                    opacity: idx === 0 ? 1 : 0.6,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════
+   主页面
+══════════════════════════════════════ */
+
+export default function DashboardPage() {
+  const openTab = useTabStore((s) => s.openTab)
+  useEffect(() => { openTab('/', '工作台') }, [openTab])
+
+  return (
+    <div className="h-full flex flex-col gap-4">
       {/* 页头 */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0">
         <LayoutDashboard className="w-6 h-6 text-gray-400" />
         <h1 className="text-xl font-semibold text-gray-900">工作台</h1>
       </div>
 
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {STATS.map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl border border-gray-200 p-5 hover:shadow-sm transition-shadow">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-gray-500">{s.label}</span>
-              <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center', s.bg)}>
-                <s.icon className={cn('w-4 h-4', s.accent)} />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-gray-900 mb-1">{s.value}</p>
-            <p className={cn('text-xs', s.trend === 'up' ? 'text-green-500' : 'text-gray-400')}>{s.sub}</p>
-          </div>
-        ))}
+      {/* 顶部趋势图 */}
+      <div className="shrink-0">
+        <TrendChart />
       </div>
 
-      {/* 中区：最近活动 + 快捷入口 */}
-      <div className="grid grid-cols-3 gap-4">
-
-        {/* 最近活动 — 占 2/3 */}
-        <div className="col-span-2 bg-white rounded-2xl border border-gray-200 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-800">最近活动</h2>
-            <button
-              onClick={() => go('/activities', '活动管理')}
-              className="text-xs text-orange-500 hover:text-orange-600 flex items-center gap-0.5 transition-colors"
-            >
-              查看全部 <ArrowRight className="w-3 h-3" />
-            </button>
-          </div>
-
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-400 border-b border-gray-100">
-                <th className="text-left pb-2 font-medium">活动名称</th>
-                <th className="text-left pb-2 font-medium">游戏</th>
-                <th className="text-left pb-2 font-medium">状态</th>
-                <th className="text-left pb-2 font-medium">组件数</th>
-                <th className="text-left pb-2 font-medium">更新时间</th>
-                <th className="pb-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {RECENT_ACTIVITIES.map((act) => {
-                const s = STATUS_MAP[act.status]
-                return (
-                  <tr
-                    key={act.id}
-                    className="border-b border-gray-50 last:border-none hover:bg-gray-50/60 cursor-pointer transition-colors"
-                    onClick={() => go(`/activities/${act.id}`, act.name)}
-                  >
-                    <td className="py-3 pr-3 font-medium text-gray-800 truncate max-w-[180px]">{act.name}</td>
-                    <td className="py-3 pr-3 text-gray-500 text-xs">{act.game}</td>
-                    <td className="py-3 pr-3">
-                      <span className={cn('inline-flex items-center gap-1 text-xs font-medium', s.cls)}>
-                        <s.icon className="w-3 h-3" />
-                        {s.label}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-3 text-gray-500 text-xs">{act.components} 个</td>
-                    <td className="py-3 pr-3 text-gray-400 text-xs">{act.updatedAt}</td>
-                    <td className="py-3">
-                      <ArrowRight className="w-3.5 h-3.5 text-gray-300" />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* 快捷入口 — 占 1/3 */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-800 mb-4">快捷入口</h2>
-          <div className="space-y-2">
-            {QUICK_ACTIONS.map((a) => (
-              <button
-                key={a.path}
-                onClick={() => go(a.path, a.tabLabel)}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all',
-                  a.highlight
-                    ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-sm shadow-orange-200'
-                    : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
-                )}
-              >
-                <div className={cn(
-                  'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-                  a.highlight ? 'bg-white/20' : 'bg-white border border-gray-200'
-                )}>
-                  <a.icon className={cn('w-4 h-4', a.highlight ? 'text-white' : 'text-gray-500')} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={cn('text-sm font-medium', a.highlight ? 'text-white' : 'text-gray-800')}>{a.label}</p>
-                  <p className={cn('text-xs truncate', a.highlight ? 'text-white/75' : 'text-gray-400')}>{a.desc}</p>
-                </div>
-                <ArrowRight className={cn('w-3.5 h-3.5 shrink-0', a.highlight ? 'text-white/60' : 'text-gray-300')} />
-              </button>
-            ))}
-          </div>
-
-          {/* AI 提示 */}
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="flex items-start gap-2 p-3 bg-orange-50 rounded-xl">
-              <Sparkles className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs font-medium text-orange-700">AI 提示</p>
-                <p className="text-xs text-orange-600/80 mt-0.5">上传设计稿，AI 可自动识别组件并完成配参，效率提升 80%</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      {/* 下方三栏 */}
+      <div className="flex-1 grid grid-cols-3 gap-4 min-h-0">
+        <RunningPanel />
+        <ExpiringPanel />
+        <RankPanel />
       </div>
     </div>
   )
