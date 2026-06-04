@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
@@ -68,20 +67,10 @@ const navItems: NavItem[] = [
   { path: '/settings', label: '设置', icon: Settings },
 ]
 
-/* 判断某个路径是否属于某个父菜单组的子项 */
-function getActiveGroupPath(activePath: string): string | null {
-  for (const item of navItems) {
-    if (item.children?.some((c) => c.path === activePath)) {
-      return item.path
-    }
-  }
-  return null
-}
-
 export function Sidebar() {
   const navigate = useNavigate()
   const { tabs, activeTabId, openTab } = useTabStore()
-  const { sidebarCollapsed, toggleSidebar } = useUIStore()
+  const { sidebarCollapsed, toggleSidebar, expandedGroups, toggleGroup, expandGroup } = useUIStore()
 
   /*
    * 手动 toggle 的折叠集合 — 记录用户「主动收起」的组。
@@ -89,7 +78,6 @@ export function Sidebar() {
    *   1) 当前路径属于某组 → 该组强制展开（忽略 toggle）
    *   2) 当前路径不属于某组 → 看 manualExpanded 是否包含该组
    */
-  const [manualExpanded, setManualExpanded] = useState<Set<string>>(new Set())
 
   const handleNav = (path: string, label: string) => {
     openTab(path, label)
@@ -99,9 +87,6 @@ export function Sidebar() {
   const activePath = tabs.find((t) => t.id === activeTabId)?.path || '/'
   const collapsed = sidebarCollapsed
 
-  /* 当前路径所属的父组 */
-  const activeGroupPath = getActiveGroupPath(activePath)
-
   /* 判断某个父菜单或其子项是否处于激活态 */
   const isGroupActive = (item: NavItem) => {
     if (!item.children) return activePath === item.path
@@ -110,23 +95,7 @@ export function Sidebar() {
 
   /* 判断子菜单是否应该展开 */
   const isGroupExpanded = (item: NavItem) => {
-    // 当前路径在这个组内 → 强制展开
-    if (activeGroupPath === item.path) return true
-    // 否则看手动状态
-    return manualExpanded.has(item.path)
-  }
-
-  /* 切换手动展开状态 */
-  const toggleGroup = (groupPath: string) => {
-    setManualExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(groupPath)) {
-        next.delete(groupPath)
-      } else {
-        next.add(groupPath)
-      }
-      return next
-    })
+    return expandedGroups.has(item.path)
   }
 
   return (
@@ -185,12 +154,10 @@ export function Sidebar() {
                   if (collapsed) {
                     // 折叠态点父级 → 直接跳到第一个子项
                     const first = item.children![0]
+                    expandGroup(item.path)
                     handleNav(first.path, first.label)
                   } else {
-                    // 当前路径在这个组内 → toggle 无效（始终保持展开）
-                    if (activeGroupPath !== item.path) {
-                      toggleGroup(item.path)
-                    }
+                    toggleGroup(item.path)
                   }
                 }}
                 title={collapsed ? item.label : undefined}
@@ -218,13 +185,13 @@ export function Sidebar() {
 
               {/* 子菜单列表 — 折叠态隐藏 */}
               {!collapsed && expanded && (
-                <div className="mt-0.5 space-y-0.5">
+                <div className="mt-0.5 space-y-0.5" onClick={(e) => e.stopPropagation()}>
                   {item.children!.map((child) => {
                     const childActive = activePath === child.path
                     return (
                       <button
                         key={child.path}
-                        onClick={() => handleNav(child.path, child.label)}
+                        onClick={() => { expandGroup(item.path); handleNav(child.path, child.label) }}
                         className={cn(
                           'w-full flex items-center gap-2 rounded-lg text-left transition-colors',
                           'pl-7 pr-2.5 py-1.5',

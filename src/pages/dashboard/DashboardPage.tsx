@@ -48,6 +48,13 @@ const GAMES = [
   { key: 'xxyg',  name: '小小蚁国',    color: '#ef4444' },
 ]
 
+
+/** 历史年度活动总数 Mock */
+const YEAR_TOTALS: { year: number; count: number }[] = [
+  { year: 2024, count: 31 },
+  { year: 2025, count: 48 },
+]
+
 /* ══════════════════════════════════════
    工具函数
 ══════════════════════════════════════ */
@@ -80,7 +87,7 @@ function inMonth(act: DashActivity, year: number, month: number) {
 }
 
 /* ══════════════════════════════════════
-   顶部：折线图趋势（按月，纯 SVG）
+   顶部趋势面板
 ══════════════════════════════════════ */
 
 function TrendChart() {
@@ -88,36 +95,28 @@ function TrendChart() {
   const year = now.getFullYear()
   const curMonth = now.getMonth() + 1
 
-  // 月度数据（1-6月）
   const months = [1, 2, 3, 4, 5, 6]
   const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月']
-
-  // 每月按游戏统计
   const monthTotals = months.map((m) => ACTIVITIES.filter((a) => inMonth(a, year, m)).length)
 
-  // 季度汇总
   const q1 = months.slice(0, 3).reduce((s, m) => s + ACTIVITIES.filter((a) => inMonth(a, year, m)).length, 0)
   const q2 = months.slice(3, 6).reduce((s, m) => s + ACTIVITIES.filter((a) => inMonth(a, year, m)).length, 0)
-  const lastM = curMonth === 1 ? 12 : curMonth - 1
-  const lastMCount = ACTIVITIES.filter((a) => inMonth(a, year === 2026 && curMonth === 1 ? year - 1 : year, lastM)).length
+  const curYearTotal = monthTotals.reduce((s, v) => s + v, 0)
+  const allYears = [...YEAR_TOTALS, { year, count: curYearTotal }]
+  const maxYearCount = Math.max(...allYears.map((y) => y.count), 1)
 
-  // 图表参数 — 柱状图 + 折线组合
-  const W = 600
-  const H = 160                         // 高度加到 160（原80的2倍）
-  const PAD_L = 28                      // 左留 Y 轴标签空间
-  const PAD_R = 12
-  const PAD_T = 20                      // 顶部留数值标注空间
-  const PAD_B = 16
+  // SVG 图表参数
+  const W = 600, H = 160
+  const PAD_L = 28, PAD_R = 12, PAD_T = 20, PAD_B = 16
   const chartW = W - PAD_L - PAD_R
   const chartH = H - PAD_T - PAD_B
-  const max = Math.max(...monthTotals, 3)  // 最少展示到3，防止全0挤在底部
-  const barW = chartW / months.length * 0.45  // 柱宽
+  const max = Math.max(...monthTotals, 3)
+  const barW = chartW / months.length * 0.45
 
   const barX = (i: number) => PAD_L + (i + 0.5) / months.length * chartW - barW / 2
   const barY = (v: number) => PAD_T + chartH - (v / max) * chartH
   const barH = (v: number) => (v / max) * chartH
 
-  // 折线点（柱顶中心）
   const pts = monthTotals.map((v, i) => ({
     x: PAD_L + (i + 0.5) / months.length * chartW,
     y: barY(v),
@@ -125,113 +124,112 @@ function TrendChart() {
   }))
   const polyline = pts.map((p) => `${p.x},${p.y}`).join(' ')
 
-  // Y 轴刻度
   const yTicks = [0, Math.round(max / 2), max]
-
-  // Q1/Q2 分割 X
   const qDivX = PAD_L + (3 / months.length) * chartW
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 px-6 py-5">
-      {/* 头部 */}
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <p className="text-sm font-semibold text-gray-800 mb-0.5">活动趋势</p>
-          <p className="text-xs text-gray-400">{year}年 按月统计</p>
-        </div>
-        <div className="flex items-center gap-6">
-          {[
-            { label: 'Q1（1-3月）', value: q1 },
-            { label: 'Q2（4-6月）', value: q2 },
-            { label: `上月（${lastM}月）`, value: lastMCount },
-          ].map((s) => (
-            <div key={s.label} className="text-right">
-              <p className="text-xl font-bold text-gray-900 leading-none">{s.value}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="grid grid-cols-3 min-h-0">
+
+        {/* 左：今年分季度 */}
+        <div className="flex flex-col justify-between px-5 py-5 border-r border-gray-200" style={{ backgroundColor: '#f9fafb' }}>
+          <div>
+            <p className="text-sm font-semibold text-gray-800 mb-0.5">{year}年分季度</p>
+            <p className="text-xs text-gray-400 mb-4">季度活动数</p>
+            <div className="space-y-4">
+              {[
+                { label: 'Q1', value: q1 },
+                { label: 'Q2', value: q2 },
+                { label: 'Q3', value: 0 },
+                { label: 'Q4', value: 0 },
+              ].map((q) => (
+                <div key={q.label} className="flex items-center gap-2">
+                  <span className="text-[10px] font-medium text-gray-400 w-6 shrink-0">{q.label}</span>
+                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-orange-400" style={{ width: Math.max(q1, q2) > 0 ? `${(q.value / Math.max(q1, q2)) * 100}%` : '0%' }} />
+                  </div>
+                  <span className={cn('text-sm font-bold w-4 text-right shrink-0', q.value > 0 ? 'text-gray-800' : 'text-gray-300')}>{q.value}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
         </div>
-      </div>
 
-      {/* 柱状图 + 折线 */}
-      <div className="relative">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 160 }}>
-          <defs>
-            <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f97316" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#f97316" stopOpacity="0.3" />
-            </linearGradient>
-          </defs>
+        {/* 中：今年分月趋势图 */}
+        <div className="px-5 py-5 border-r border-gray-200">
+          <p className="text-sm font-semibold text-gray-800 mb-0.5">{year}年月度趋势</p>
+          <p className="text-xs text-gray-400 mb-2">按月统计</p>
+          <div className="relative">
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 160 }}>
+              <defs>
+                <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#f97316" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="#f97316" stopOpacity="0.3" />
+                </linearGradient>
+              </defs>
+              {yTicks.map((v) => {
+                const y = PAD_T + chartH - (v / max) * chartH
+                return (
+                  <g key={v}>
+                    <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="#f3f4f6" strokeWidth="1" />
+                    <text x={PAD_L - 4} y={y + 3} textAnchor="end" fontSize="9" fill="#9ca3af">{v}</text>
+                  </g>
+                )
+              })}
+              <line x1={qDivX} y1={PAD_T} x2={qDivX} y2={PAD_T + chartH} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4,3" />
+              <text x={qDivX - 4} y={PAD_T - 6} textAnchor="end" fontSize="9" fill="#d1d5db">Q1</text>
+              <text x={qDivX + 4} y={PAD_T - 6} textAnchor="start" fontSize="9" fill="#d1d5db">Q2</text>
+              {monthTotals.map((v, i) => (
+                <rect key={i} x={barX(i)} y={barY(v)} width={barW} height={barH(v)}
+                  fill={i + 1 > curMonth ? '#f3f4f6' : 'url(#barGrad)'}
+                  rx="3" ry="3" />
+              ))}
+              <polyline points={polyline} fill="none" stroke="#f97316" strokeWidth="2"
+                strokeLinejoin="round" strokeLinecap="round" />
+              {pts.map((p, i) => (
+                <g key={i}>
+                  <circle cx={p.x} cy={p.y} r="3.5"
+                    fill={i + 1 > curMonth ? '#e5e7eb' : '#f97316'}
+                    stroke="white" strokeWidth="1.5" />
+                  {p.v > 0 && (
+                    <text x={p.x} y={p.y - 8} textAnchor="middle" fontSize="10"
+                      fill={i + 1 > curMonth ? '#9ca3af' : '#f97316'} fontWeight="600">{p.v}</text>
+                  )}
+                </g>
+              ))}
+              <line x1={PAD_L} y1={PAD_T + chartH} x2={W - PAD_R} y2={PAD_T + chartH} stroke="#e5e7eb" strokeWidth="1" />
+              {monthLabels.map((l, i) => (
+                <text key={i} x={PAD_L + (i + 0.5) / months.length * chartW}
+                  y={PAD_T + chartH + 12} textAnchor="middle" fontSize="10"
+                  fill={i + 1 <= curMonth ? '#6b7280' : '#d1d5db'}>{l}</text>
+              ))}
+            </svg>
+          </div>
+        </div>
 
-          {/* Y 轴刻度线 + 数值 */}
-          {yTicks.map((v) => {
-            const y = PAD_T + chartH - (v / max) * chartH
-            return (
-              <g key={v}>
-                <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="#f3f4f6" strokeWidth="1" />
-                <text x={PAD_L - 4} y={y + 3} textAnchor="end" fontSize="9" fill="#9ca3af">{v}</text>
-              </g>
-            )
-          })}
+        {/* 右：历年活动趋势 */}
+        <div className="flex flex-col justify-between px-5 py-5" style={{ backgroundColor: '#f9fafb' }}>
+          <div>
+            <p className="text-sm font-semibold text-gray-800 mb-0.5">历年活动</p>
+            <p className="text-xs text-gray-400 mb-4">年度活动数</p>
+            <div className="space-y-3">
+              {allYears.map((y) => (
+                <div key={y.year}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-gray-500">{y.year}年</span>
+                    <span className={cn('text-sm font-bold', y.year === year ? 'text-orange-500' : 'text-gray-700')}>{y.count}</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${(y.count / maxYearCount) * 100}%`, backgroundColor: y.year === year ? '#f97316' : '#9ca3af' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-3">共 {allYears.reduce((s, y) => s + y.count, 0)} 个活动</p>
+        </div>
 
-          {/* Q1/Q2 分割虚线 */}
-          <line x1={qDivX} y1={PAD_T} x2={qDivX} y2={PAD_T + chartH} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4,3" />
-          <text x={qDivX - 4} y={PAD_T - 6} textAnchor="end" fontSize="9" fill="#d1d5db">Q1</text>
-          <text x={qDivX + 4} y={PAD_T - 6} textAnchor="start" fontSize="9" fill="#d1d5db">Q2</text>
-
-          {/* 柱状图 */}
-          {monthTotals.map((v, i) => {
-            const x = barX(i)
-            const y = barY(v)
-            const h = barH(v)
-            const isFuture = i + 1 > curMonth
-            return (
-              <rect key={i} x={x} y={y} width={barW} height={h}
-                fill={isFuture ? '#f3f4f6' : 'url(#barGrad)'}
-                rx="3" ry="3"
-              />
-            )
-          })}
-
-          {/* 折线（覆盖在柱上） */}
-          <polyline points={polyline} fill="none" stroke="#f97316" strokeWidth="2"
-            strokeLinejoin="round" strokeLinecap="round" />
-
-          {/* 折线数据点 + 数值标注 */}
-          {pts.map((p, i) => {
-            const isFuture = i + 1 > curMonth
-            return (
-              <g key={i}>
-                <circle cx={p.x} cy={p.y} r="3.5"
-                  fill={isFuture ? '#e5e7eb' : '#f97316'}
-                  stroke="white" strokeWidth="1.5" />
-                {p.v > 0 && (
-                  <text x={p.x} y={p.y - 8} textAnchor="middle" fontSize="10"
-                    fill={isFuture ? '#9ca3af' : '#f97316'} fontWeight="600">
-                    {p.v}
-                  </text>
-                )}
-              </g>
-            )
-          })}
-
-          {/* X 轴底线 */}
-          <line x1={PAD_L} y1={PAD_T + chartH} x2={W - PAD_R} y2={PAD_T + chartH} stroke="#e5e7eb" strokeWidth="1" />
-
-          {/* X 轴月份标签（SVG内） */}
-          {monthLabels.map((l, i) => (
-            <text
-              key={i}
-              x={PAD_L + (i + 0.5) / months.length * chartW}
-              y={PAD_T + chartH + 12}
-              textAnchor="middle"
-              fontSize="10"
-              fill={i + 1 <= curMonth ? '#6b7280' : '#d1d5db'}
-            >
-              {l}
-            </text>
-          ))}
-        </svg>
       </div>
     </div>
   )
