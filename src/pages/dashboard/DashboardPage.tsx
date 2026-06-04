@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, CheckCircle2, AlertTriangle, ArrowRight, ChevronLeft, ChevronRight,
+  LayoutDashboard, CheckCircle2, AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
