@@ -1,6 +1,7 @@
 /* 组件库 — Zustand Store + Mock 数据 */
 
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { ComponentItem, ComponentStatus } from '@/types/component'
 
 /* ── Mock 数据：首批 10 个核心组件 ─────────────────────── */
@@ -252,6 +253,20 @@ const MOCK_COMPONENTS: ComponentItem[] = [
       { id: 'lb-list', name: '纯列表', description: '简洁列表排行', previewType: 'leaderboard-list', previewColors: ['#64748b', '#94a3b8'], previewLayout: 'list' },
     ],
   },
+  {
+    id: 'comp-gift-draft',
+    name: '礼包领取组件',
+    category: 'interaction',
+    status: 'wip',
+    description: '通过 AI 对话创建的组件草稿，待完善参数配置。',
+    previewEmoji: '🎁',
+    usageCount: 0,
+    createdAt: '2026-06-05',
+    updatedAt: '2026-06-05',
+    aiSignature: { visualDescription: '礼包领取按钮区域，用户点击领取活动礼包', keywords: ['礼包', '领取', '礼物'] },
+    parameterSchema: [],
+    variants: [{ id: 'gift-default', name: '默认', description: 'AI 生成变体', previewType: 'default', previewColors: ['#f97316', '#fb923c'], previewLayout: 'default' }],
+  },
 ]
 
 /* ── Store ──────────────────────────────────────────── */
@@ -267,7 +282,7 @@ interface ComponentStore {
   addVariant: (componentId: string, name: string, description: string) => void
 }
 
-export const useComponentStore = create<ComponentStore>((set, get) => ({
+export const useComponentStore = create<ComponentStore>()(persist((set, get) => ({
   components: MOCK_COMPONENTS,
 
   getById: (id) => get().components.find((c) => c.id === id),
@@ -284,7 +299,7 @@ export const useComponentStore = create<ComponentStore>((set, get) => ({
   remove: (id) => {
     const comp = get().getById(id)
     if (!comp) return false
-    if (comp.status === 'available') return false
+    if (comp.status === 'available') return false  // 已上线不允许直接删除
     set((s) => ({ components: s.components.filter((c) => c.id !== id) }))
     return true
   },
@@ -318,4 +333,4 @@ export const useComponentStore = create<ComponentStore>((set, get) => ({
           : c
       ),
     })),
-}))
+}), { name: 'component-store' }))

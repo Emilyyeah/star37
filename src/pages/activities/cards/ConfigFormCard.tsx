@@ -1,8 +1,15 @@
 import { cn } from '@/lib/utils'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, MessageCircle } from 'lucide-react'
 import type { MatchedComponent } from '../types'
 
 export function ConfigFormCard({ components, embedded }: { components: MatchedComponent[]; embedded?: boolean }) {
+  // 统计待填的必填字段
+  const pendingFields = components.flatMap((comp) =>
+    comp.params
+      .filter((p) => p.required && !p.aiInferred && (!p.value || p.value === ''))
+      .map((p) => ({ compName: comp.name, label: p.label }))
+  )
+
   return (
     <div className={embedded ? "space-y-4" : "bg-white border border-gray-200 rounded-2xl rounded-tl-md p-5 space-y-4"}>
       {components.map((comp) => (
@@ -37,11 +44,30 @@ export function ConfigFormCard({ components, embedded }: { components: MatchedCo
           </div>
         </div>
       ))}
-      <div className="flex justify-end pt-2">
-        <button className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">
-          预览活动
-        </button>
-      </div>
+
+      {/* 底部：待填项提示 / 完成提示 */}
+      {pendingFields.length > 0 ? (
+        <div className="flex items-start gap-2.5 mt-2 p-3 bg-orange-50 border border-orange-100 rounded-xl">
+          <MessageCircle className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-orange-700 mb-1">
+              还有 {pendingFields.length} 个🟠必填项需要补充，直接在下方对话告诉我：
+            </p>
+            <ul className="space-y-0.5">
+              {pendingFields.map((f, i) => (
+                <li key={i} className="text-xs text-orange-600">
+                  · {f.compName} → {f.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 mt-2 p-3 bg-green-50 border border-green-100 rounded-xl">
+          <span className="text-green-500 text-sm">✅</span>
+          <p className="text-xs text-green-700 font-medium">所有参数已填写完整，可以继续对话微调或直接保存草稿</p>
+        </div>
+      )}
     </div>
   )
 }

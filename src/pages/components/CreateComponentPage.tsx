@@ -4,21 +4,21 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import {
-  Send, Sparkles, User, Eye, PanelRightClose, PanelRightOpen, Smartphone, ImagePlus, X,
-} from 'lucide-react'
+import { Send, Sparkles, User, Eye, PanelRightClose, PanelRightOpen, Smartphone, ImagePlus, X, Save } from 'lucide-react'
 import { cn, showToast } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
 import { useComponentStore } from '@/lib/componentStore'
 import { SessionPanel } from '@/pages/activities/components/SessionPanel'
 import type { ConversationSession } from '@/pages/activities/types'
+import type { ComponentItem } from '@/types/component'
 
 const MAX_IMAGES = 5
 
 interface ChatMsg {
   id: string
   role: 'user' | 'ai'
-  content: string
+  content?: string
+  images?: string[]   // 用户上传的图片 URL 列表
   timestamp: number
 }
 
@@ -43,20 +43,53 @@ export default function CreateComponentPage() {
   const [searchParams] = useSearchParams()
   const openTab = useTabStore((s) => s.openTab)
   const getById = useComponentStore((s) => s.getById)
+  const addComponent = useComponentStore((s) => s.add)
 
   /* 读取 URL 参数：?variant=comp-xxx */
   const variantForId = searchParams.get('variant')
+  const copyFromId   = searchParams.get('copy')   // 复制已有组件进 AI 流程
+  const resumeId     = searchParams.get('resume')  // 继续构建草稿
+
   const variantForComp = useMemo(() => variantForId ? getById(variantForId) : null, [variantForId, getById])
+  const copyFromComp   = useMemo(() => copyFromId   ? getById(copyFromId)   : null, [copyFromId, getById])
+  const resumeComp     = useMemo(() => resumeId     ? getById(resumeId)     : null, [resumeId, getById])
+
   const isVariantMode = !!variantForComp
+  const isCopyMode    = !!copyFromComp
+  const isResumeMode  = !!resumeComp
 
   /* 根据模式生成初始欢迎语和会话标题 */
-  const initialTitle = isVariantMode ? `${variantForComp.name} · 添加变体` : '新组件'
-  const initialWelcome = isVariantMode
-    ? `你好！我是组件生成助手 ✦\n\n当前正在为「${variantForComp.name}」添加新的样式变体。\n\n该组件已有 ${variantForComp.variants.length} 个变体：${variantForComp.variants.map((v) => v.name).join('、')}。\n\n请描述你想要的新变体风格，比如：\n· 「暗色主题，深色背景」\n· 「简约扁平风」\n· 「节日喜庆版，红色主调」`
-    : '你好！我是组件生成助手 ✦\n\n描述你需要的组件类型、功能和样式，我来帮你生成。\n\n你也可以上传参考截图，我会识别并生成对应组件。'
+  const initialTitle = isVariantMode
+    ? `${variantForComp!.name} · 添加变体`
+    : isCopyMode
+      ? `AI 复刻 · ${copyFromComp!.name}`
+      : isResumeMode
+        ? `继续构建 · ${resumeComp!.name}`
+        : '新组件'
 
-  const tabTitle = isVariantMode ? `添加变体 · ${variantForComp.name}` : '创建组件'
-  const tabPath = isVariantMode ? `/components/create?variant=${variantForId}` : '/components/create'
+  const initialWelcome = isVariantMode
+    ? `你好！我是组件生成助手 ✦\n\n当前正在为「${variantForComp!.name}」添加新的样式变体。\n\n该组件已有 ${variantForComp!.variants.length} 个变体：${variantForComp!.variants.map((v) => v.name).join('、')}。\n\n请描述你想要的新变体风格，比如：\n· 「暗色主题，深色背景」\n· 「简约扁平风」\n· 「节日喜庆版，红色主调」`
+    : isCopyMode
+      ? `你好！我是组件生成助手 ✦\n\n当前正在基于「${copyFromComp!.name}」生成新版本。\n\n原组件说明：${copyFromComp!.description}\n\n请描述你想要做哪些改动，比如：\n· 「修改成暗色主题」\n· 「增加动画效果」\n· 「改变布局方式」\n\n我会在原组件基础上生成全新的独立组件。`
+      : isResumeMode
+        ? `你好！继续构建「${resumeComp!.name}」✦\n\n这是一个草稿状态的组件，我们继续完善它。\n\n当前描述：${resumeComp!.description}\n\n你可以继续描述修改需求，完成后点击「发布上线」提交审核，或「保存草稿」继续保留。`
+        : '你好！我是组件生成助手 ✦\n\n描述你需要的组件类型、功能和样式，我来帮你生成。\n\n你也可以上传参考截图，我会识别并生成对应组件。'
+
+  const tabTitle = isVariantMode
+    ? `添加变体 · ${variantForComp!.name}`
+    : isCopyMode
+      ? `AI 复刻 · ${copyFromComp!.name}`
+      : isResumeMode
+        ? `继续构建 · ${resumeComp!.name}`
+        : '创建组件'
+
+  const tabPath = isVariantMode
+    ? `/components/create?variant=${variantForId}`
+    : isCopyMode
+      ? `/components/create?copy=${copyFromId}`
+      : isResumeMode
+        ? `/components/create?resume=${resumeId}`
+        : '/components/create'
 
   useEffect(() => { openTab(tabPath, tabTitle) }, [openTab, tabPath, tabTitle])
 
@@ -70,7 +103,8 @@ export default function CreateComponentPage() {
   const [input, setInput] = useState('')
   const [showPreview, setShowPreview] = useState(true)
   const [pastedImages, setPastedImages] = useState<{ file: File; url: string }[]>([])
-  const [hasGenerated, setHasGenerated] = useState(false)
+  // 只要用户发过消息，就显示按钮和预览内容（不依赖关键词命中）
+  const hasUserMessage = messages.some((m) => m.role === 'user')
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; sessionId: string } | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -89,11 +123,13 @@ export default function CreateComponentPage() {
 
   const handleSendWithImages = () => {
     if (pastedImages.length > 0) {
-      // 把粘贴图片作为用户消息展示
+      // 和活动创建一样，显示图片预览气泡
+      const urls = pastedImages.map((p) => p.url)
       setMessages((prev) => [...prev, {
         id: String(Date.now()),
         role: 'user',
-        content: `[上传了 ${pastedImages.length} 张参考截图]${input.trim() ? '\n' + input.trim() : ''}`,
+        images: urls,
+        content: input.trim() || undefined,
         timestamp: Date.now(),
       }])
       setPastedImages([])
@@ -122,9 +158,6 @@ export default function CreateComponentPage() {
 
     setTimeout(() => {
       addMessage({ role: 'ai', content: mockReply(trimmed) })
-      if (!hasGenerated && (trimmed.includes('转盘') || trimmed.includes('签到') || trimmed.includes('banner') || trimmed.includes('横幅') || trimmed.includes('抽奖') || trimmed.includes('弹窗') || trimmed.includes('暗色') || trimmed.includes('风格') || trimmed.includes('主题'))) {
-        setHasGenerated(true)
-      }
     }, 800)
   }
 
@@ -138,7 +171,6 @@ export default function CreateComponentPage() {
     setMessages([
       { id: 'w1-' + newId, role: 'ai', content: isVariantMode ? initialWelcome : '你好！开始创建新组件吧 ✦\n\n描述你需要的组件类型和功能，我来生成。', timestamp: Date.now() },
     ])
-    setHasGenerated(false)
   }
 
   const handleSwitchSession = (id: string) => {
@@ -208,6 +240,70 @@ export default function CreateComponentPage() {
     })
   }
 
+  /* ── 构建 / 更新 ComponentItem ── */
+  const updateComponent = useComponentStore((s) => s.update)
+  const updateStatus = useComponentStore((s) => s.updateStatus)
+
+  const buildComponent = (status: 'wip' | 'testing'): ComponentItem => {
+    const firstUserMsg = messages.find((m) => m.role === 'user')
+    const rawName = firstUserMsg?.content?.trim() || initialTitle
+    const name = rawName.length > 20 ? rawName.slice(0, 20) + '…' : rawName
+    const now = new Date().toISOString().slice(0, 10)
+    const base = isCopyMode ? copyFromComp! : null
+    return {
+      id: `comp-${Date.now()}`,
+      name,
+      category: base?.category ?? 'display',
+      status: status as 'wip' | 'testing',
+      description: base
+        ? `基于「${base.name}」AI 复刻：${name}`
+        : `通过 AI 对话创建的组件：${name}`,
+      previewEmoji: base?.previewEmoji ?? '✨',
+      usageCount: 0,
+      createdAt: now,
+      updatedAt: now,
+      aiSignature: base?.aiSignature ?? { visualDescription: name, keywords: [] },
+      parameterSchema: base?.parameterSchema ?? [],
+      variants: base?.variants ?? [{ id: `var-${Date.now()}`, name: '默认', description: 'AI 生成变体', previewType: 'default', previewColors: ['#f97316', '#fb923c'] as [string, string], previewLayout: 'default' }],
+    }
+  }
+
+  /* 保存草稿：
+     - resume 模式 → 更新草稿条目的名称和描述
+     - 其他模式   → 新建 draft 条目 */
+  const handleSaveDraft = () => {
+    const firstUserMsg = messages.find((m) => m.role === 'user')
+    const rawName = firstUserMsg?.content?.trim() || initialTitle
+    const name = rawName.length > 20 ? rawName.slice(0, 20) + '…' : rawName
+
+    if (isResumeMode && resumeComp) {
+      updateComponent(resumeComp.id, { name, description: `通过 AI 对话更新：${name}` })
+      showToast(`草稿「${name}」已更新`)
+    } else {
+      const comp = buildComponent('wip')
+      addComponent(comp)
+      showToast(`「${comp.name}」已保存为草稿`)
+    }
+    openTab('/components', '组件库')
+    navigate('/components')
+  }
+
+  /* 发布：
+     - resume 模式 → 将草稿状态改为 testing（待上线）
+     - 其他模式   → 新建 testing 条目 */
+  const handlePublish = () => {
+    if (isResumeMode && resumeComp) {
+      updateStatus(resumeComp.id, 'testing')
+      showToast(`「${resumeComp.name}」已提交上线审核`)
+    } else {
+      const comp = buildComponent('testing')
+      addComponent(comp)
+      showToast(`「${comp.name}」已提交上线审核`)
+    }
+    openTab('/components', '组件库')
+    navigate('/components')
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
@@ -243,7 +339,7 @@ export default function CreateComponentPage() {
         <div className="flex-1 flex min-h-0 overflow-hidden">
           {/* 对话流 */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-6 space-y-5 min-w-0">
-            {messages.map((msg) => {
+          {messages.map((msg) => {
               const isAI = msg.role === 'ai'
               return (
                 <div key={msg.id} className={cn('flex gap-3', !isAI && 'flex-row-reverse')}>
@@ -251,11 +347,23 @@ export default function CreateComponentPage() {
                     {isAI ? <Sparkles className="w-4 h-4 text-blue-600" /> : <User className="w-4 h-4 text-orange-600" />}
                   </div>
                   <div className={cn('min-w-0 max-w-[80%]', !isAI && 'text-right')}>
-                    <div className={cn('inline-block rounded-2xl px-4 py-3 text-sm leading-relaxed break-all', isAI ? 'bg-white border border-gray-200 text-gray-800 rounded-tl-md' : 'bg-orange-500 text-white rounded-tr-md')}>
-                      {msg.content.split('\n').map((line, i) => (
-                        <span key={i}>{line}{i < msg.content.split('\n').length - 1 && <br />}</span>
-                      ))}
-                    </div>
+                    {/* 图片消息 — 和活动创建一致的缩略图展示 */}
+                    {msg.images && msg.images.length > 0 && (
+                      <div className={cn('flex flex-wrap gap-2 mb-1.5', !isAI && 'justify-end')}>
+                        {msg.images.map((url, i) => (
+                          <img key={i} src={url} alt={`截图 ${i + 1}`}
+                            className="h-28 w-auto max-w-[160px] rounded-xl border border-orange-200 object-cover shadow-sm" />
+                        ))}
+                      </div>
+                    )}
+                    {/* 文字消息 */}
+                    {msg.content && (
+                      <div className={cn('inline-block rounded-2xl px-4 py-3 text-sm leading-relaxed break-all', isAI ? 'bg-white border border-gray-200 text-gray-800 rounded-tl-md' : 'bg-orange-500 text-white rounded-tr-md')}>
+                        {msg.content.split('\n').map((line, i) => (
+                          <span key={i}>{line}{i < msg.content!.split('\n').length - 1 && <br />}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )
@@ -284,7 +392,7 @@ export default function CreateComponentPage() {
                       <div className="w-16 h-3 bg-gray-900 rounded-full" />
                     </div>
                     <div className="overflow-auto" style={{ height: 473 }}>
-                      {hasGenerated ? (
+                      {hasUserMessage ? (
                         <div>
                           <div className="h-32 bg-gradient-to-r from-blue-400 to-purple-500 flex items-end p-4">
                             <p className="text-white font-bold text-sm">组件预览</p>
@@ -312,11 +420,19 @@ export default function CreateComponentPage() {
                   </div>
                 </div>
               </div>
-              {hasGenerated && (
-                <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-end gap-2">
-                  <button onClick={() => navigate('/components')} className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">取消</button>
-                  <button onClick={() => navigate('/components')} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
-                    {isVariantMode ? '保存变体' : '入库为待上线'}
+              {hasUserMessage && (
+                <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-end gap-2 shrink-0">
+                  <button
+                    onClick={handleSaveDraft}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <Save className="w-3.5 h-3.5" />保存草稿
+                  </button>
+                  <button
+                    onClick={handlePublish}
+                    className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                  >
+                    {isVariantMode ? '发布变体' : isResumeMode ? '提交上线' : '发布上线'}
                   </button>
                 </div>
               )}
@@ -352,7 +468,17 @@ export default function CreateComponentPage() {
                 <ImagePlus className="w-5 h-5" />
               </button>
               <textarea ref={inputRef} value={input} onChange={handleTextarea} onKeyDown={handleKeyDown} onPaste={handlePaste}
-                placeholder={pastedImages.length > 0 ? '添加描述（可选），按 Enter 发送截图...' : isVariantMode ? `描述「${variantForComp!.name}」的新变体风格...` : '描述你需要的组件，如「转盘抽奖，6个奖品，支持每日限制」'}
+                placeholder={
+                  pastedImages.length > 0
+                    ? '添加描述（可选），按 Enter 发送截图...'
+                    : isVariantMode
+                      ? `描述「${variantForComp!.name}」的新变体风格...`
+                      : isCopyMode
+                        ? `描述对「${copyFromComp!.name}」的改动需求...`
+                        : isResumeMode
+                          ? `继续描述「${resumeComp!.name}」的完善需求...`
+                          : '描述你需要的组件，如「转盘抽奖，6个奖品，支持每日限制」'
+                }
                 rows={1} className="flex-1 resize-none bg-transparent text-sm leading-relaxed focus:outline-none placeholder:text-gray-400 py-1.5" />
               <button onClick={handleSendWithImages} disabled={!input.trim() && pastedImages.length === 0}
                 className={cn('shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors', (input.trim() || pastedImages.length > 0) ? 'bg-orange-500 text-white hover:bg-orange-600' : 'text-gray-300')}>

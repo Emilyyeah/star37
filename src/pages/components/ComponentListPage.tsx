@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Puzzle, Search, Plus, Clock, BarChart3,
-  FileText, Eye, Activity, ChevronDown, Trash2, Pencil, Copy,
+  FileText, Eye, Activity, ChevronDown, Trash2, Pencil, Copy, Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useComponentStore } from '@/lib/componentStore'
@@ -36,7 +36,6 @@ export default function ComponentListPage() {
   const components = useComponentStore((s) => s.components)
   const updateStatus = useComponentStore((s) => s.updateStatus)
   const removeComp = useComponentStore((s) => s.remove)
-  const duplicateComp = useComponentStore((s) => s.duplicate)
   const updateComp = useComponentStore((s) => s.update)
 
   const [search, setSearch] = useState('')
@@ -69,9 +68,10 @@ export default function ComponentListPage() {
   }, [components, category, search])
 
   /* 按状态分组 */
-  const onlineList = useMemo(() => filtered.filter((c) => c.status === 'available'), [filtered])
-  const pendingList = useMemo(() => filtered.filter((c) => c.status === 'testing'), [filtered])
-  const disabledList = useMemo(() => filtered.filter((c) => c.status === 'draft'), [filtered])
+  const wipList      = useMemo(() => filtered.filter((c) => c.status === 'wip'),       [filtered])
+  const onlineList   = useMemo(() => filtered.filter((c) => c.status === 'available'), [filtered])
+  const pendingList  = useMemo(() => filtered.filter((c) => c.status === 'testing'),   [filtered])
+  const disabledList = useMemo(() => filtered.filter((c) => c.status === 'draft'),     [filtered])
 
   /* 选中组件 */
   const selected = useMemo(() => {
@@ -79,8 +79,8 @@ export default function ComponentListPage() {
       const found = components.find((c) => c.id === selectedId)
       if (found) return found
     }
-    return onlineList[0] || pendingList[0] || disabledList[0] || null
-  }, [components, selectedId, onlineList, pendingList, disabledList])
+    return onlineList[0] || pendingList[0] || disabledList[0] || wipList[0] || null
+  }, [components, selectedId, wipList, onlineList, pendingList, disabledList])
 
   const handleSelect = (id: string) => {
     setSelectedId(id)
@@ -94,6 +94,17 @@ export default function ComponentListPage() {
   const handleStatusChange = (newStatus: ComponentStatus) => {
     if (selected) updateStatus(selected.id, newStatus)
     setStatusOpen(false)
+  }
+
+  const handleCopy = (id: string) => {
+    // 已上线组件复制：进入 AI 流程，带入原组件信息
+    openTab('/components/create', 'AI 创建组件')
+    navigate(`/components/create?copy=${id}`)
+  }
+
+  const handleResume = (id: string) => {
+    openTab('/components/create', '继续构建')
+    navigate(`/components/create?resume=${id}`)
   }
 
   const handleDelete = () => {
@@ -140,6 +151,7 @@ export default function ComponentListPage() {
           <StatusSection title="已上线" count={onlineList.length} dotColor="bg-green-500" items={onlineList} selectedId={selected?.id ?? null} onSelect={handleSelect} defaultOpen />
           <StatusSection title="待上线" count={pendingList.length} dotColor="bg-blue-500" items={pendingList} selectedId={selected?.id ?? null} onSelect={handleSelect} defaultOpen />
           <StatusSection title="停用" count={disabledList.length} dotColor="bg-gray-400" items={disabledList} selectedId={selected?.id ?? null} onSelect={handleSelect} defaultOpen={showDisabled} onToggle={() => setShowDisabled(!showDisabled)} collapsible />
+          <StatusSection title="草稿" count={wipList.length} dotColor="bg-yellow-400" items={wipList} selectedId={selected?.id ?? null} onSelect={handleSelect} defaultOpen />
           {onlineList.length === 0 && pendingList.length === 0 && disabledList.length === 0 && (
             <div className="px-4 py-10 text-center">
               <Puzzle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
@@ -188,30 +200,51 @@ export default function ComponentListPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {/* 编辑 — 所有状态都有 */}
                   <button onClick={() => { setEditing(true); setEditForm({ name: selected.name, description: selected.description }) }}
                     className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
-                    <Pencil className="w-3 h-3" />编辑</button>
-                  <button onClick={() => { const newId = duplicateComp(selected.id); if (newId) handleSelect(newId) }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
-                    <Copy className="w-3 h-3" />复制</button>
-                  <div className="relative">
-                    <button onClick={() => setStatusOpen(!statusOpen)}
+                    <Pencil className="w-3 h-3" />编辑
+                  </button>
+
+                  {/* 草稿专属：继续构建，无复制、无变更状态 */}
+                  {selected.status === 'wip' && (
+                    <button onClick={() => handleResume(selected.id)}
                       className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
-                      变更状态 <ChevronDown className="w-3 h-3" /></button>
-                    {statusOpen && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setStatusOpen(false)} />
-                        <div className="absolute right-0 mt-1 w-28 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                          {STATUS_FLOW.map((st) => (
-                            <button key={st} onClick={() => handleStatusChange(st)} disabled={st === selected.status}
-                              className={cn('w-full px-3 py-1.5 text-xs text-left', st === selected.status ? 'text-gray-300' : 'text-gray-700 hover:bg-gray-50')}>
-                              <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5', { 'bg-gray-400': st === 'draft', 'bg-blue-500': st === 'testing', 'bg-green-500': st === 'available' })} />
-                              {STATUS_LABELS[st]}</button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                      <Sparkles className="w-3 h-3" />继续构建
+                    </button>
+                  )}
+
+                  {/* 非草稿：复制 + 变更状态 */}
+                  {selected.status !== 'wip' && (
+                    <>
+                      <button onClick={() => handleCopy(selected.id)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
+                        <Copy className="w-3 h-3" />复制
+                      </button>
+                      <div className="relative">
+                        <button onClick={() => setStatusOpen(!statusOpen)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
+                          变更状态 <ChevronDown className="w-3 h-3" />
+                        </button>
+                        {statusOpen && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setStatusOpen(false)} />
+                            <div className="absolute right-0 mt-1 w-28 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                              {STATUS_FLOW.map((st) => (
+                                <button key={st} onClick={() => handleStatusChange(st)} disabled={st === selected.status}
+                                  className={cn('w-full px-3 py-1.5 text-xs text-left', st === selected.status ? 'text-gray-300' : 'text-gray-700 hover:bg-gray-50')}>
+                                  <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5', { 'bg-gray-400': st === 'draft', 'bg-blue-500': st === 'testing', 'bg-green-500': st === 'available' })} />
+                                  {STATUS_LABELS[st]}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {/* 删除 — 已上线不能删 */}
                   {selected.status !== 'available' ? (
                     deleteConfirm ? (
                       <div className="flex gap-1">
@@ -219,7 +252,9 @@ export default function ComponentListPage() {
                         <button onClick={() => setDeleteConfirm(false)} className="px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg">取消</button>
                       </div>
                     ) : (
-                      <button onClick={() => setDeleteConfirm(true)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg" title="删除"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => setDeleteConfirm(true)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg" title="删除">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     )
                   ) : (
                     <Trash2 className="w-4 h-4 text-gray-200" />

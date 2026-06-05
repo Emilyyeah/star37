@@ -174,13 +174,32 @@ export function useChat() {
       setPreviewComponents(components)
       setShowPreview(true)
 
+      // 收集所有必填但 AI 未推断的字段，列举出来引导用户填写
+      const pendingFields: { compName: string; fieldLabel: string }[] = []
+      components.forEach((comp) => {
+        comp.params.forEach((p) => {
+          if (p.required && !p.aiInferred && (!p.value || p.value === '')) {
+            pendingFields.push({ compName: comp.name, fieldLabel: p.label })
+          }
+        })
+      })
+
       addMessage({ role: 'user', content: '已确认组件清单 ✓' })
+
       setTimeout(() => {
+        addMessage({ role: 'ai', card: { type: 'config-form', components } })
+
+        // AI 引导消息：列出待填字段
+        const guideLines = pendingFields.length > 0
+          ? `\n\n📋 **还有 ${pendingFields.length} 个必填项需要你提供：**\n` +
+            pendingFields.map((f) => `• ${f.compName} → ${f.fieldLabel}`).join('\n') +
+            '\n\n你可以直接告诉我，比如「奖品列表设置为：一等奖手机一台，二等奖平板一台」，我会帮你填进去。'
+          : '\n\n✅ 所有参数 AI 已自动识别！你可以直接对话微调，或点击右下角「保存草稿」保存活动。'
+
         addMessage({
           role: 'ai',
-          content: '配置活动参数。🟢 绿色是我从设计稿推断的，🟠 橙色需要你填写。\n\n你也可以直接对话修改，如「把每日次数改成 5 次」',
+          content: '🟢 绿色字段是我从设计稿推断出来的，🟠 橙色是需要你补充的内容。' + guideLines,
         })
-        addMessage({ role: 'ai', card: { type: 'config-form', components } })
       }, 500)
     },
     [addMessage]

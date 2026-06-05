@@ -2,12 +2,13 @@ import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
 import { useUIStore } from '@/lib/uiStore'
+import { useAuthStore, type FeatureKey } from '@/lib/authStore'
 import {
   LayoutDashboard,
   Sparkles,
   FolderOpen,
   Puzzle,
-  LayoutTemplate,
+  // LayoutTemplate, /* [模板功能暂停] */
   BarChart3,
   LineChart,
   BarChart2,
@@ -28,35 +29,38 @@ interface NavChild {
   path: string
   label: string
   icon: React.ElementType
+  feature?: FeatureKey  // 需要的功能权限
 }
 
 interface NavItem {
   path: string
   label: string
   icon: React.ElementType
+  feature?: FeatureKey  // 需要的功能权限（无子菜单时使用）
   children?: NavChild[]
 }
 
 const navItems: NavItem[] = [
-  { path: '/', label: '工作台', icon: LayoutDashboard },
-  { path: '/activities/create', label: '创建活动', icon: Sparkles },
-  { path: '/activities', label: '活动管理', icon: FolderOpen },
-  { path: '/components', label: '组件库', icon: Puzzle },
-  { path: '/templates', label: '模板库', icon: LayoutTemplate },
+  { path: '/', label: '工作台', icon: LayoutDashboard, feature: 'dashboard' },
+  { path: '/activities/create', label: '创建活动', icon: Sparkles, feature: 'activity.create' },
+  { path: '/activities', label: '活动管理', icon: FolderOpen, feature: 'activity.list' },
+  { path: '/components', label: '组件库', icon: Puzzle, feature: 'component.list' },
+  // { path: '/templates', label: '模板库', icon: LayoutTemplate, feature: 'template.list' }, /* [模板功能暂停] */
   {
     path: '/assets',
     label: '美术素材库',
     icon: Image,
     children: [
-      { path: '/assets', label: '素材库', icon: FolderOpen },
-      { path: '/assets/generate', label: 'AI 生图', icon: ImagePlus },
-      { path: '/assets/edit', label: 'AI 改图', icon: Wand2 },
+      { path: '/assets', label: '素材库', icon: FolderOpen, feature: 'asset.list' },
+      { path: '/assets/generate', label: 'AI 生图', icon: ImagePlus, feature: 'asset.generate' },
+      { path: '/assets/edit', label: 'AI 改图', icon: Wand2, feature: 'asset.edit' },
     ],
   },
   {
     path: '/analytics',
     label: '数据分析',
     icon: BarChart3,
+    feature: 'analytics',
     children: [
       { path: '/analytics/overview',   label: '活动概览',     icon: LineChart },
       { path: '/analytics/components', label: '组件分析',     icon: BarChart2 },
@@ -64,13 +68,14 @@ const navItems: NavItem[] = [
       { path: '/analytics/detail',     label: '活动数据明细', icon: Table2 },
     ],
   },
-  { path: '/settings', label: '设置', icon: Settings },
+  { path: '/settings', label: '设置', icon: Settings, feature: 'settings' },
 ]
 
 export function Sidebar() {
   const navigate = useNavigate()
   const { tabs, activeTabId, openTab } = useTabStore()
   const { sidebarCollapsed, toggleSidebar, expandedGroups, toggleGroup, expandGroup } = useUIStore()
+  const hasFeature = useAuthStore((s) => s.hasFeature)
 
   /*
    * 手动 toggle 的折叠集合 — 记录用户「主动收起」的组。
@@ -117,7 +122,15 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
+        {navItems
+        .filter((item) => {
+          // 无子菜单 → 直接检查 feature
+          if (!item.children) return !item.feature || hasFeature(item.feature)
+          // 有子菜单 → 如果父级有 feature 就检查；否则检查子项至少有一个有权限
+          if (item.feature) return hasFeature(item.feature)
+          return item.children.some((c) => !c.feature || hasFeature(c.feature))
+        })
+        .map((item) => {
           const hasChildren = !!item.children
           const groupActive = isGroupActive(item)
 
@@ -186,7 +199,7 @@ export function Sidebar() {
               {/* 子菜单列表 — 折叠态隐藏 */}
               {!collapsed && expanded && (
                 <div className="mt-0.5 space-y-0.5" onClick={(e) => e.stopPropagation()}>
-                  {item.children!.map((child) => {
+                  {item.children!.filter((c) => !c.feature || hasFeature(c.feature)).map((child) => {
                     const childActive = activePath === child.path
                     return (
                       <button

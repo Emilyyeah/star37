@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Copy, Gamepad2, Calendar, Users, Layers, Smartphone, ChevronDown, ChevronRight, LayoutTemplate } from 'lucide-react'
-import { SaveAsTemplateDialog } from './components/SaveAsTemplateDialog'
+import { ArrowLeft, Copy, Gamepad2, Calendar, Users, Layers, Smartphone, ChevronDown, ChevronRight } from 'lucide-react'
+// import { SaveAsTemplateDialog } from './components/SaveAsTemplateDialog' /* [模板功能暂停] */
 import { cn } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
 
@@ -109,7 +109,7 @@ export default function ActivityDetailPage() {
   const navigate = useNavigate()
   const openTab = useTabStore((s) => s.openTab)
   const detail = id ? MOCK_DETAILS[id] : null
-  const [showSaveTpl, setShowSaveTpl] = useState(false)
+  // const [showSaveTpl, setShowSaveTpl] = useState(false) /* [模板功能暂停] */
 
   useEffect(() => {
     if (detail) openTab(`/activities/${id}`, detail.name)
@@ -145,9 +145,11 @@ export default function ActivityDetailPage() {
             <button onClick={() => navigate(`/activities/create?copy=${detail.id}`)} className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
               <Copy className="w-3.5 h-3.5" />复制活动
             </button>
+            {/* [模板功能暂停]
             <button onClick={() => setShowSaveTpl(true)} className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
               <LayoutTemplate className="w-3.5 h-3.5" />存为模板
             </button>
+            */}
             <button onClick={() => navigate(`/activities/create?edit=${detail.id}`)} className="px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 transition-colors">
               编辑活动
             </button>
@@ -208,7 +210,7 @@ export default function ActivityDetailPage() {
         </div>
       </div>
 
-      {/* 存为模板弹窗 */}
+      {/* [模板功能暂停]
       {showSaveTpl && (
         <SaveAsTemplateDialog
           activity={{
@@ -219,6 +221,7 @@ export default function ActivityDetailPage() {
           onSaved={() => setShowSaveTpl(false)}
         />
       )}
+      */}
     </div>
   )
 }

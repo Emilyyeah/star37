@@ -1,7 +1,7 @@
 /* 组件库 — 类型定义 */
 
 export type ComponentCategory = 'lottery' | 'task' | 'display' | 'exchange' | 'interaction'
-export type ComponentStatus = 'draft' | 'testing' | 'available'
+export type ComponentStatus = 'wip' | 'draft' | 'testing' | 'available'
 
 export const CATEGORY_LABELS: Record<ComponentCategory, string> = {
   lottery: '抽奖',
@@ -12,12 +12,14 @@ export const CATEGORY_LABELS: Record<ComponentCategory, string> = {
 }
 
 export const STATUS_LABELS: Record<ComponentStatus, string> = {
+  wip: '草稿',
   draft: '停用',
   testing: '待上线',
   available: '已上线',
 }
 
 export const STATUS_COLORS: Record<ComponentStatus, string> = {
+  wip: 'bg-yellow-100 text-yellow-700',
   draft: 'bg-gray-100 text-gray-600',
   testing: 'bg-blue-100 text-blue-600',
   available: 'bg-green-100 text-green-600',

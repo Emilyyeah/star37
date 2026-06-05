@@ -2,10 +2,11 @@
    布局：左栏（会话/组件面板） | 中栏（对话流/画布） | 右栏（3 Tab：活动预览 / 组件配置 / 活动配置） */
 
 import { useState, useEffect } from 'react'
-import { Sparkles, MousePointerClick, Settings, Puzzle, Eye } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Sparkles, MousePointerClick, Settings, Puzzle, Eye, Save } from 'lucide-react'
+import { cn, showToast } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
 import { useUIStore } from '@/lib/uiStore'
+import { useNavigate } from 'react-router-dom'
 import { useChat } from './hooks/useChat'
 import { regionsToComponents } from './hooks/mockData'
 import { SessionPanel } from './components/SessionPanel'
@@ -16,7 +17,7 @@ import { ComponentPalette } from './components/ComponentPalette'
 import { CanvasArea } from './components/CanvasArea'
 import { PropertyPanel } from './components/PropertyPanel'
 import { GlobalConfigPanel } from './components/GlobalConfigPanel'
-import { TemplateSelectorDialog } from './components/TemplateSelectorDialog'
+// import { TemplateSelectorDialog } from './components/TemplateSelectorDialog' /* [模板功能暂停] */
 import { useManualBuilder } from './hooks/useManualBuilder'
 import { PublishDialog, PublishSuccessDialog, validateCanvas, validateGlobalConfig } from './components/PublishDialog'
 import type { ValidationError } from './components/PublishDialog'
@@ -27,6 +28,7 @@ type RightTab = 'preview' | 'component' | 'activity'
 
 export default function CreateActivityPage() {
   const openTab = useTabStore((s) => s.openTab)
+  const navigate = useNavigate()
   const { sessionPanelWidth, sessionPanelCollapsed } = useUIStore()
   const [mode, setMode] = useState<CreateMode>('ai')
   const [rightTab, setRightTab] = useState<RightTab>('activity')
@@ -35,10 +37,10 @@ export default function CreateActivityPage() {
 
   const chat = useChat()
 
-  // 识别完成后自动切到预览 Tab
-  useEffect(() => {
-    if (chat.recognitionRegions.length > 0) setRightTab('preview')
-  }, [chat.recognitionRegions])
+  // 识别完成后不再自动跳预览，保持在对话流让用户继续交互
+  // useEffect(() => {
+  //   if (chat.recognitionRegions.length > 0) setRightTab('preview')
+  // }, [chat.recognitionRegions])
 
   const builder = useManualBuilder()
 
@@ -54,9 +56,29 @@ export default function CreateActivityPage() {
     setRightTab('component')
   }
 
+  const [savingDraft, setSavingDraft] = useState(false)
+
+  /* ── 保存草稿 ── */
+  const handleSaveDraft = () => {
+    const activityName = builder.globalConfig.activityName?.trim()
+    if (!activityName) {
+      showToast('请先在「活动配置」中填写活动名称')
+      setRightTab('activity')
+      return
+    }
+    setSavingDraft(true)
+    setTimeout(() => {
+      setSavingDraft(false)
+      showToast(`「${activityName}」已保存为草稿`)
+      // 跳转到活动管理
+      openTab('/activities', '活动管理')
+      navigate('/activities')
+    }, 600)
+  }
+
   /* ── 发布流程 ── */
   const [showPublishDialog, setShowPublishDialog] = useState(false)
-  const [showTemplateSelector, setShowTemplateSelector] = useState(false)
+  // const [showTemplateSelector, setShowTemplateSelector] = useState(false) /* [模板功能暂停] */
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [publishErrors, setPublishErrors] = useState<ValidationError[]>([])
   const [publishedActivity, setPublishedActivity] = useState({ name: '', url: '' })
@@ -141,7 +163,7 @@ export default function CreateActivityPage() {
                 onDropFiles={(files) => chat.handleFiles(files)}
                 latestRegions={chat.recognitionRegions}
                 onItemsChange={(regions) => chat.setPreviewComponents(regionsToComponents(regions.filter((r) => r.confirmed)))}
-                onSelectTemplate={() => setShowTemplateSelector(true)}
+                // onSelectTemplate={() => setShowTemplateSelector(true)} /* [模板功能暂停] */
               />
             ) : (
               <CanvasArea
@@ -214,8 +236,26 @@ export default function CreateActivityPage() {
 
             {/* 底部按钮 */}
             {(builder.canvas.length > 0 || mode === 'ai') && (
-              <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-end shrink-0">
-                <button onClick={handlePublishClick} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">发布</button>
+              <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={savingDraft}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors',
+                    savingDraft
+                      ? 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
+                      : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                  )}
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  {savingDraft ? '保存中...' : '保存草稿'}
+                </button>
+                <button
+                  onClick={handlePublishClick}
+                  className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                >
+                  发布
+                </button>
               </div>
             )}
           </div>
@@ -229,7 +269,7 @@ export default function CreateActivityPage() {
         )}
       </div>
 
-      {/* 模板选择弹窗 */}
+      {/* [模板功能暂停]
       {showTemplateSelector && (
         <TemplateSelectorDialog
           onClose={() => setShowTemplateSelector(false)}
@@ -240,6 +280,7 @@ export default function CreateActivityPage() {
           }}
         />
       )}
+      */}
 
       {/* ═══ 弹窗 ═══ */}
       <PublishDialog

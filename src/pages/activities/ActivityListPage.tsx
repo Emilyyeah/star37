@@ -2,20 +2,16 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FolderOpen, Search, Plus, Copy, Pencil, Ban, X, ChevronLeft, ChevronRight, LayoutTemplate } from 'lucide-react'
-import { SaveAsTemplateDialog } from './components/SaveAsTemplateDialog'
+import { FolderOpen, Search, Plus, Copy, Pencil, Ban, X, ChevronLeft, ChevronRight } from 'lucide-react'
+// import { SaveAsTemplateDialog } from './components/SaveAsTemplateDialog' /* [模板功能暂停] */
 import { cn } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
+import { useAuthStore, ALL_GAMES } from '@/lib/authStore'
 
-/* ── 游戏项目 ── */
-const GAME_TABS = [
+/* ── 游戏项目（全量列表，渲染时按权限过滤） ── */
+const ALL_GAME_TABS = [
   { key: 'all', label: '全部游戏' },
-  { key: 'dl3d', label: '斗罗3D' },
-  { key: 'dlmmo', label: '斗罗MMO' },
-  { key: 'frxxt', label: '凡人修仙传' },
-  { key: 'sc33', label: '生存33天' },
-  { key: 'zmsl', label: '织梦森林' },
-  { key: 'xxyg', label: '小小蚁国' },
+  ...ALL_GAMES.map((g) => ({ key: g.key, label: g.label })),
 ]
 
 /* ── 类型 ── */
@@ -59,8 +55,19 @@ const INITIAL_ACTIVITIES: ActivityItem[] = [
 export default function ActivityListPage() {
   const navigate = useNavigate()
   const openTab = useTabStore((s) => s.openTab)
+  const hasFeature = useAuthStore((s) => s.hasFeature)
+  const viewableGameKeys = useAuthStore((s) => s.viewableGameKeys)
+  const canEditGame = useAuthStore((s) => s.canEditGame)
 
   useEffect(() => { openTab('/activities', '活动管理') }, [openTab])
+
+  /* 按用户游戏权限过滤 Tab */
+  const viewable = viewableGameKeys()
+  const GAME_TABS = useMemo(() => {
+    const filtered = ALL_GAME_TABS.filter((t) => t.key === 'all' || viewable.includes(t.key))
+    // 如果只有一个游戏，不显示"全部游戏" Tab
+    return filtered.length <= 2 ? filtered.filter((t) => t.key !== 'all') : filtered
+  }, [viewable])
 
   const [activities, setActivities] = useState<ActivityItem[]>(INITIAL_ACTIVITIES)
   const [gameTab, setGameTab] = useState('all')
@@ -68,11 +75,13 @@ export default function ActivityListPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [offlineConfirm, setOfflineConfirm] = useState<ActivityItem | null>(null)
-  const [saveAsTpl, setSaveAsTpl] = useState<ActivityItem | null>(null)
+  // const [saveAsTpl, setSaveAsTpl] = useState<ActivityItem | null>(null) /* [模板功能暂停] */
 
   // 筛选后的全量数据
   const filtered = useMemo(() => {
     let list = activities
+    // 只显示有权查看的游戏的活动
+    list = list.filter((a) => viewable.includes(a.gameProject))
     if (gameTab !== 'all') list = list.filter((a) => a.gameProject === gameTab)
     if (statusFilter !== 'all') list = list.filter((a) => a.status === statusFilter)
     if (search.trim()) {
@@ -80,7 +89,7 @@ export default function ActivityListPage() {
       list = list.filter((a) => a.name.toLowerCase().includes(kw))
     }
     return list
-  }, [activities, gameTab, statusFilter, search])
+  }, [activities, gameTab, statusFilter, search, viewable])
 
   // 分页
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -114,14 +123,16 @@ export default function ActivityListPage() {
             <FolderOpen className="w-5 h-5 text-gray-400" />
             <h1 className="text-lg font-semibold text-gray-900">活动管理</h1>
           </div>
-          <button onClick={() => navigate('/activities/create')} className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">
-            <Plus className="w-4 h-4" />新建活动
-          </button>
+          {hasFeature('activity.create') && (
+            <button onClick={() => navigate('/activities/create')} className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">
+              <Plus className="w-4 h-4" />新建活动
+            </button>
+          )}
         </div>
 
-        {/* 游戏 Tab（不显示数量） */}
+        {/* 游戏 Tab（按用户权限过滤） */}
         <div className="flex items-center gap-1 border-b border-gray-200 -mx-6 px-6">
-          {GAME_TABS.map((tab) => (
+          {GAME_TABS.filter((t) => t.key === 'all' || viewable.includes(t.key)).map((tab) => (
             <button key={tab.key} onClick={() => { setGameTab(tab.key); setStatusFilter('all') }}
               className={cn('px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px',
                 gameTab === tab.key ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700')}>
@@ -184,20 +195,26 @@ export default function ActivityListPage() {
                     <td className="px-4 py-3 text-xs text-gray-500">{act.createdAt}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-0.5">
-                        <button onClick={() => handleEdit(act.id)} className="p-1.5 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="编辑">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => handleCopy(act)} className="p-1.5 rounded-md text-gray-400 hover:text-orange-600 hover:bg-orange-50 transition-colors" title="复制">
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-                        {act.status === 'running' && (
+                        {canEditGame(act.gameProject) && (
+                          <button onClick={() => handleEdit(act.id)} className="p-1.5 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="编辑">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {canEditGame(act.gameProject) && (
+                          <button onClick={() => handleCopy(act)} className="p-1.5 rounded-md text-gray-400 hover:text-orange-600 hover:bg-orange-50 transition-colors" title="复制">
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {act.status === 'running' && canEditGame(act.gameProject) && (
                           <button onClick={() => setOfflineConfirm(act)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="下架">
                             <Ban className="w-3.5 h-3.5" />
                           </button>
                         )}
+                        {/* [模板功能暂停]
                         <button onClick={() => setSaveAsTpl(act)} className="p-1.5 rounded-md text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors" title="存为模板">
                           <LayoutTemplate className="w-3.5 h-3.5" />
                         </button>
+                        */}
                       </div>
                     </td>
                   </tr>
@@ -256,7 +273,7 @@ export default function ActivityListPage() {
         </div>
       )}
 
-      {/* 存为模板弹窗 */}
+      {/* [模板功能暂停]
       {saveAsTpl && (
         <SaveAsTemplateDialog
           activity={{
@@ -267,6 +284,7 @@ export default function ActivityListPage() {
           onSaved={() => setSaveAsTpl(null)}
         />
       )}
+      */}
     </div>
   )
 }
