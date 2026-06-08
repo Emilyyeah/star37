@@ -49,7 +49,7 @@ export default function LoginPage() {
             alt="37手游"
             className="h-8 mx-auto mb-4 object-contain"
           />
-          <h1 className="text-2xl font-bold text-gray-900">魔方活动系统</h1>
+          <h1 className="text-2xl font-bold text-gray-900">魔方活动平台</h1>
           <p className="text-sm text-gray-400 mt-1">登录你的账号</p>
         </div>
 

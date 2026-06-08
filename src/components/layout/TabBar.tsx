@@ -47,7 +47,7 @@ export function TabBar() {
     <div className="h-12 bg-gray-50 border-b border-gray-200 flex items-end shrink-0">
       {/* 系统名 — 与标签同行，左侧固定 */}
       <div className="h-full flex items-center px-4 shrink-0 border-r border-gray-200 pb-0">
-        <span className="text-xl font-bold text-gray-900 whitespace-nowrap">魔方活动系统</span>
+        <span className="text-xl font-bold text-gray-900 whitespace-nowrap">魔方活动平台</span>
       </div>
       {/* 标签列表 */}
       <div className="flex items-end flex-1 px-2 gap-0.5 overflow-x-auto h-full">
