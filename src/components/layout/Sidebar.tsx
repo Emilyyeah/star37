@@ -21,6 +21,7 @@ import {
   Image,
   ImagePlus,
   Wand2,
+  Layers,
 } from 'lucide-react'
 
 /* ── 导航数据结构 ── */
@@ -52,6 +53,7 @@ const navItems: NavItem[] = [
     icon: Image,
     children: [
       { path: '/assets', label: '素材库', icon: FolderOpen, feature: 'asset.list' },
+      { path: '/assets/templates', label: '模板创建', icon: Layers, feature: 'asset.list' },
       { path: '/assets/generate', label: 'AI 生图', icon: ImagePlus, feature: 'asset.generate' },
       { path: '/assets/edit', label: 'AI 改图', icon: Wand2, feature: 'asset.edit' },
     ],

@@ -1,31 +1,13 @@
 /* AI 生图 — 文生图 + 风格预设
    左栏：生图配置 | 右栏：结果预览网格 */
 
-import { useState, useEffect } from 'react'
-import { ImagePlus, Sparkles, Image, Download, Loader2 } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { ImagePlus, Sparkles, Image, Download, Loader2, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
 import { showToast } from '@/lib/utils'
-
-/* ── 游戏风格预设 ── */
-const STYLE_PRESETS = [
-  { key: 'dl3d', label: '斗罗3D', desc: '3D渲染·热血·玄幻' },
-  { key: 'dlmmo', label: '斗罗MMO', desc: '国风·写实·史诗' },
-  { key: 'frxxt', label: '凡人修仙传', desc: '水墨·仙侠·古风' },
-  { key: 'sc33', label: '生存33天', desc: '末日·写实·暗色调' },
-  { key: 'zmsl', label: '织梦森林', desc: 'Q版·清新·温暖' },
-  { key: 'xxyg', label: '小小蚁国', desc: '卡通·策略·微观' },
-]
-
-/* ── 场景模板 ── */
-const SCENE_TEMPLATES = [
-  { key: 'banner', label: '活动 Banner', size: '750×400' },
-  { key: 'popup', label: '弹窗', size: '600×800' },
-  { key: 'splash', label: '开屏图', size: '1080×1920' },
-  { key: 'push', label: '推送图', size: '400×300' },
-  { key: 'social', label: '社媒配图', size: '1080×1080' },
-  { key: 'share', label: '分享卡片', size: '500×400' },
-]
+import { useAssetCategoryStore } from '@/lib/assetCategoryStore'
+import { useNavigate } from 'react-router-dom'
 
 /* ── Mock 生成结果 ── */
 interface GeneratedImage {
@@ -43,11 +25,31 @@ const PLACEHOLDER_COLORS = [
 
 export default function AssetGeneratePage() {
   const openTab = useTabStore((s) => s.openTab)
+  const navigate = useNavigate()
   useEffect(() => { openTab('/assets/generate', 'AI 生图') }, [openTab])
 
-  const [prompt, setPrompt] = useState('')
+  /* 从 store 读取原始数据，在组件内派生，避免选择器每次返回新数组引用 */
+  const gameStyles = useAssetCategoryStore((s) => s.gameStyles)
+  const enabledStyles = useMemo(() => gameStyles.filter((g) => g.enabled), [gameStyles])
+
+  const scenes = useAssetCategoryStore((s) => s.scenes)
+  const enabledScenes = useMemo(() => scenes.filter((sc) => sc.enabled), [scenes])
+
+  const sceneTemplates = useAssetCategoryStore((s) => s.sceneTemplates)
+
+  /* 选中场景后，列出该场景下的尺寸规格 */
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null)
-  const [selectedScene, setSelectedScene] = useState<string | null>(null)
+  const [selectedScene, setSelectedScene] = useState<string | null>(null)   // sceneId
+  const [selectedSize, setSelectedSize] = useState<string | null>(null)     // sizeId
+
+  const sizesForScene = useMemo(() => {
+    if (!selectedScene) return []
+    return sceneTemplates.find((t) => t.sceneId === selectedScene)?.sizes.filter((s) => s.enabled) ?? []
+  }, [selectedScene, sceneTemplates])
+
+  // 切换场景时重置尺寸选择
+  useEffect(() => { setSelectedSize(null) }, [selectedScene])
+  const [prompt, setPrompt] = useState('')
   const [generating, setGenerating] = useState(false)
   const [results, setResults] = useState<GeneratedImage[]>([])
   const [count, setCount] = useState(4)
@@ -58,8 +60,8 @@ export default function AssetGeneratePage() {
     if (!selectedScene) { showToast('请选择场景模板'); return }
 
     setGenerating(true)
-    // Mock 生成过程
     setTimeout(() => {
+      const sizeName = sizesForScene.find((sz) => sz.id === selectedSize)
       const newResults: GeneratedImage[] = Array.from({ length: count }, (_, i) => ({
         id: `gen-${Date.now()}-${i}`,
         prompt: prompt.trim(),
@@ -69,7 +71,7 @@ export default function AssetGeneratePage() {
       }))
       setResults((prev) => [...newResults, ...prev])
       setGenerating(false)
-      showToast(`已生成 ${count} 张图片`)
+      showToast(`已生成 ${count} 张图片${sizeName ? `（${sizeName.width}×${sizeName.height}）` : ''}`)
     }, 2000)
   }
 
@@ -100,47 +102,88 @@ export default function AssetGeneratePage() {
 
           {/* 游戏风格 */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">游戏风格预设 <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-2 gap-2">
-              {STYLE_PRESETS.map((s) => (
-                <button
-                  key={s.key}
-                  onClick={() => setSelectedStyle(s.key)}
-                  className={cn(
-                    'text-left px-3 py-2.5 rounded-xl border transition-colors',
-                    selectedStyle === s.key
-                      ? 'border-orange-400 bg-orange-50 text-orange-600'
-                      : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                  )}
-                >
-                  <p className="text-xs font-medium">{s.label}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{s.desc}</p>
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-medium text-gray-700">游戏风格预设 <span className="text-red-500">*</span></label>
+              <button onClick={() => { navigate('/assets/templates'); openTab('/assets/templates', '模板创建') }}
+                className="inline-flex items-center gap-1 text-[10px] text-orange-500 hover:text-orange-600 font-medium">
+                <Settings className="w-3 h-3" />管理风格
+              </button>
             </div>
+            {enabledStyles.length === 0 ? (
+              <div className="border border-dashed border-gray-200 rounded-xl p-4 text-center text-xs text-gray-400">
+                暂无风格预设，<button onClick={() => navigate('/assets/templates')} className="text-orange-500 underline">去添加</button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {enabledStyles.map((s) => (
+                  <button key={s.id} onClick={() => setSelectedStyle(s.id)}
+                    className={cn('text-left px-3 py-2.5 rounded-xl border transition-colors',
+                      selectedStyle === s.id
+                        ? 'border-orange-400 bg-orange-50 text-orange-600'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    )}
+                  >
+                    <p className="text-xs font-medium">{s.label}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">{s.styleName.split('·')[1]?.trim() ?? s.styleName}</p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 场景模板 */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">场景模板 <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-2 gap-2">
-              {SCENE_TEMPLATES.map((s) => (
-                <button
-                  key={s.key}
-                  onClick={() => setSelectedScene(s.key)}
-                  className={cn(
-                    'text-left px-3 py-2.5 rounded-xl border transition-colors',
-                    selectedScene === s.key
-                      ? 'border-orange-400 bg-orange-50 text-orange-600'
-                      : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                  )}
-                >
-                  <p className="text-xs font-medium">{s.label}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{s.size}</p>
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-medium text-gray-700">场景模板 <span className="text-red-500">*</span></label>
+              <button onClick={() => { navigate('/assets/templates'); openTab('/assets/templates', '模板创建') }}
+                className="inline-flex items-center gap-1 text-[10px] text-orange-500 hover:text-orange-600 font-medium">
+                <Settings className="w-3 h-3" />管理场景
+              </button>
             </div>
+            {scenes.length === 0 ? (
+              <div className="border border-dashed border-gray-200 rounded-xl p-4 text-center text-xs text-gray-400">
+                暂无场景，<button onClick={() => navigate('/settings')} className="text-orange-500 underline">去设置添加</button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {enabledScenes.map((sc) => (
+                  <button key={sc.id} onClick={() => setSelectedScene(sc.id)}
+                    className={cn('text-left px-3 py-2.5 rounded-xl border transition-colors',
+                      selectedScene === sc.id
+                        ? 'border-orange-400 bg-orange-50 text-orange-600'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    )}
+                  >
+                    <p className="text-xs font-medium">{sc.label}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                      {sceneTemplates.find((t) => t.sceneId === sc.id)?.sizes.filter((s) => s.enabled).length ?? 0} 个尺寸
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* 尺寸规格（选择场景后显示） */}
+          {selectedScene && sizesForScene.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">尺寸规格</label>
+              <div className="grid grid-cols-2 gap-2">
+                {sizesForScene.map((sz) => (
+                  <button key={sz.id} onClick={() => setSelectedSize(sz.id)}
+                    className={cn('text-left px-3 py-2.5 rounded-xl border transition-colors',
+                      selectedSize === sz.id
+                        ? 'border-orange-400 bg-orange-50 text-orange-600'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    )}
+                  >
+                    <p className="text-xs font-medium">{sz.name}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5 font-mono">{sz.width}×{sz.height}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 生成数量 */}
           <div>
@@ -211,10 +254,10 @@ export default function AssetGeneratePage() {
                     <p className="text-xs text-gray-500 truncate">{img.prompt}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-500 font-medium">
-                        {STYLE_PRESETS.find((s) => s.key === img.style)?.label}
+                        {enabledStyles.find((s) => s.id === img.style)?.label ?? img.style}
                       </span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-500 font-medium">
-                        {SCENE_TEMPLATES.find((s) => s.key === img.scene)?.label}
+                        {enabledScenes.find((sc) => sc.id === img.scene)?.label ?? img.scene}
                       </span>
                     </div>
                   </div>

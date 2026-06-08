@@ -21,6 +21,7 @@ import DetailPage      from '@/pages/analytics/DetailPage'
 import AssetLibraryPage from '@/pages/assets/AssetLibraryPage'
 import AssetGeneratePage from '@/pages/assets/AssetGeneratePage'
 import AssetEditPage from '@/pages/assets/AssetEditPage'
+import AssetTemplatePage from '@/pages/assets/AssetTemplatePage'
 import CreditsPage from '@/pages/credits/CreditsPage'
 
 /* ── 登录守卫 ── */
@@ -55,6 +56,7 @@ export default function App() {
         {/* <Route path="/templates/:id" element={<TemplateDetailPage />} /> */}
         {/* [模板功能暂停] */}
         <Route path="/assets" element={<AssetLibraryPage />} />
+        <Route path="/assets/templates" element={<AssetTemplatePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/credits" element={<CreditsPage />} />
         <Route path="/data" element={<DataBoardPage />} />
