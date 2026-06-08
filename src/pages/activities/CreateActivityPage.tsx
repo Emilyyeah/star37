@@ -2,11 +2,12 @@
    布局：左栏（会话/组件面板） | 中栏（对话流/画布） | 右栏（3 Tab：活动预览 / 组件配置 / 活动配置） */
 
 import { useState, useEffect } from 'react'
-import { Sparkles, MousePointerClick, Settings, Puzzle, Eye, Save } from 'lucide-react'
+import { Sparkles, MousePointerClick, Settings, Puzzle, Eye, Save, ImagePlus, X } from 'lucide-react'
 import { cn, showToast } from '@/lib/utils'
 import { useTabStore } from '@/lib/tabStore'
 import { useUIStore } from '@/lib/uiStore'
 import { useNavigate } from 'react-router-dom'
+import { useThemeStore } from '@/lib/themeStore'
 import { useChat } from './hooks/useChat'
 import { regionsToComponents } from './hooks/mockData'
 import { SessionPanel } from './components/SessionPanel'
@@ -30,6 +31,20 @@ export default function CreateActivityPage() {
   const openTab = useTabStore((s) => s.openTab)
   const navigate = useNavigate()
   const { sessionPanelWidth, sessionPanelCollapsed } = useUIStore()
+  const setHeroImage = useThemeStore((s) => s.setHeroImage)
+  const extractFromImage = useThemeStore((s) => s.extractFromImage)
+  const resetTheme = useThemeStore((s) => s.resetTheme)
+  const heroImageUrl = useThemeStore((s) => s.heroImageUrl)
+
+  /* ── 头图上传 → 自动提取主色 ── */
+  const handleHeroUpload = (file: File) => {
+    const url = URL.createObjectURL(file)
+    setHeroImage(url)
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => { extractFromImage(img); showToast('已提取头图主色，预览配色已同步') }
+    img.src = url
+  }
   const [mode, setMode] = useState<CreateMode>('ai')
   const [rightTab, setRightTab] = useState<RightTab>('activity')
 
@@ -166,12 +181,41 @@ export default function CreateActivityPage() {
                 // onSelectTemplate={() => setShowTemplateSelector(true)} /* [模板功能暂停] */
               />
             ) : (
-              <CanvasArea
-                canvas={builder.canvas} selectedIdx={builder.selectedIdx}
-                onSelect={handleCanvasSelect}
-                onMoveUp={builder.moveUp} onMoveDown={builder.moveDown}
-                onRemove={builder.removeFromCanvas}
-              />
+              <div className="flex flex-col h-full overflow-hidden">
+                {/* 头图上传区 — 手动模式中栏顶部 */}
+                <div className="shrink-0 px-3 py-2 border-b border-gray-100 bg-gray-50/60">
+                  {heroImageUrl ? (
+                    <div className="flex items-center gap-2">
+                      <img src={heroImageUrl} alt="头图" className="h-8 w-14 object-cover rounded border border-gray-200" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-600 font-medium">活动头图已上传</p>
+                        <p className="text-[10px] text-orange-500">主题色已同步 ✓</p>
+                      </div>
+                      <button
+                        onClick={() => { setHeroImage(null); resetTheme() }}
+                        className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-gray-200 hover:border-orange-400 hover:bg-orange-50/30 transition-colors cursor-pointer">
+                      <ImagePlus className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-xs text-gray-400">上传活动头图，自动提取配色</span>
+                      <input type="file" accept="image/*" className="hidden"
+                        onChange={(e) => e.target.files?.[0] && handleHeroUpload(e.target.files[0])} />
+                    </label>
+                  )}
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <CanvasArea
+                    canvas={builder.canvas} selectedIdx={builder.selectedIdx}
+                    onSelect={handleCanvasSelect}
+                    onMoveUp={builder.moveUp} onMoveDown={builder.moveDown}
+                    onRemove={builder.removeFromCanvas}
+                  />
+                </div>
+              </div>
             )}
           </div>
 
@@ -191,17 +235,45 @@ export default function CreateActivityPage() {
             {/* Tab 内容 */}
             <div className="flex-1 overflow-auto min-h-0">
               {rightTab === 'preview' && (
-                <PreviewPanel
-                  show={true}
-                  components={chat.previewComponents}
-                  onToggle={() => {}}
-                  embedded
-                  selectedIdx={chat.selectedCompIdx}
-                  onSelectIdx={(idx) => {
-                    chat.setSelectedCompIdx(chat.selectedCompIdx === idx ? null : idx)
-                    setRightTab('component')
-                  }}
-                />
+                <div className="flex flex-col h-full">
+                  {/* 头图上传区 */}
+                  <div className="shrink-0 px-3 py-2.5 border-b border-gray-100 bg-gray-50/50">
+                    <p className="text-[10px] font-medium text-gray-500 mb-1.5">活动头图（上传后自动应用风格）</p>
+                    {heroImageUrl ? (
+                      <div className="flex items-center gap-2">
+                        <img src={heroImageUrl} alt="头图" className="h-10 w-16 object-cover rounded-md border border-gray-200" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-600 font-medium truncate">头图已上传</p>
+                          <p className="text-[10px] text-orange-500">主题色已提取 ✓</p>
+                        </div>
+                        <button onClick={() => { setHeroImage(null); resetTheme() }}
+                          className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-gray-200 hover:border-orange-400 hover:bg-orange-50/30 transition-colors cursor-pointer">
+                        <ImagePlus className="w-4 h-4 text-gray-400" />
+                        <span className="text-xs text-gray-400">上传活动头图，AI 自动提取配色风格</span>
+                        <input type="file" accept="image/*" className="hidden"
+                          onChange={(e) => e.target.files?.[0] && handleHeroUpload(e.target.files[0])} />
+                      </label>
+                    )}
+                  </div>
+                  <div className="flex-1 overflow-auto flex justify-center items-start p-4">
+                    <PreviewPanel
+                      show={true}
+                      components={chat.previewComponents}
+                      onToggle={() => {}}
+                      embedded
+                      selectedIdx={chat.selectedCompIdx}
+                      onSelectIdx={(idx) => {
+                        chat.setSelectedCompIdx(chat.selectedCompIdx === idx ? null : idx)
+                        setRightTab('component')
+                      }}
+                    />
+                  </div>
+                </div>
               )}
               {rightTab === 'component' && (
                 mode === 'ai'

@@ -99,7 +99,6 @@ export function useChat() {
     if (!trimmed) return
     addMessage({ role: 'user', content: trimmed })
     setInput('')
-
     setSessions((prev) =>
       prev.map((s) =>
         s.active && s.title === '新活动'

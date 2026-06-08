@@ -1,19 +1,18 @@
-/* 预览面板 — AI 模式
-   embedded=true 时不渲染外层容器/标题栏，由父级统一管理 */
+/* 预览面板 — 简约白卡风格
+   页面底色跟随头图主色（浅色），组件统一白卡 */
 
 import { PanelRightOpen, PanelRightClose, Eye, Smartphone } from 'lucide-react'
 import { PhoneShell } from '@/components/PhoneShell'
 import { cn } from '@/lib/utils'
 import type { MatchedComponent } from '../types'
+import { useThemeStore, type ActivityTheme } from '@/lib/themeStore'
 
 interface PreviewPanelProps {
   show: boolean
   components: MatchedComponent[]
   onToggle: (show: boolean) => void
   embedded?: boolean
-  /** 当前高亮的组件 index */
   selectedIdx?: number | null
-  /** 点击组件块时回调 */
   onSelectIdx?: (idx: number) => void
 }
 
@@ -25,17 +24,15 @@ export function PreviewPanel({ show, components, onToggle, embedded, selectedIdx
       </div>
     )
   }
-
   if (!show) {
     return (
       <div className="w-10 border-l border-gray-200 bg-white flex flex-col items-center py-2 shrink-0">
-        <button onClick={() => onToggle(true)} className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="展开预览">
+        <button onClick={() => onToggle(true)} className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100" title="展开预览">
           <PanelRightOpen className="w-4 h-4" />
         </button>
       </div>
     )
   }
-
   return (
     <div className="w-[380px] border-l border-gray-200 bg-white flex flex-col shrink-0">
       <div className="h-10 flex items-center justify-between px-4 border-b border-gray-100 shrink-0">
@@ -43,7 +40,7 @@ export function PreviewPanel({ show, components, onToggle, embedded, selectedIdx
           <Eye className="w-4 h-4 text-gray-400" />
           <span className="text-sm font-medium text-gray-700">活动预览</span>
         </div>
-        <button onClick={() => onToggle(false)} className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100" title="收起预览">
+        <button onClick={() => onToggle(false)} className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100">
           <PanelRightClose className="w-4 h-4" />
         </button>
       </div>
@@ -54,194 +51,347 @@ export function PreviewPanel({ show, components, onToggle, embedded, selectedIdx
   )
 }
 
-/* ── 手机框预览 ── */
-function PhonePreview({
-  components, selectedIdx, onSelectIdx,
-}: {
+/* ── 手机框 ── */
+function PhonePreview({ components, selectedIdx, onSelectIdx }: {
   components: MatchedComponent[]
   selectedIdx?: number | null
   onSelectIdx?: (idx: number) => void
 }) {
+  const theme = useThemeStore((s) => s.theme)
+  const heroImageUrl = useThemeStore((s) => s.heroImageUrl)
+
   return (
     <PhoneShell width={240} contentHeight={460}>
-      <div>
-        {components.length > 0 ? (
-          <div>
-            {components.map((comp, idx) => (
-              <div
-                key={comp.id}
-                onClick={() => onSelectIdx?.(idx)}
-                className={cn(
-                  'relative transition-all duration-150',
-                  onSelectIdx && 'cursor-pointer',
-                  selectedIdx === idx
-                    ? 'ring-2 ring-orange-400 ring-inset z-10'
-                    : onSelectIdx && 'hover:ring-1 hover:ring-orange-200 hover:ring-inset'
-                )}
-              >
-                <PreviewBlock component={comp} />
-                {selectedIdx === idx && (
-                  <div className="absolute top-1 left-1 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded z-20 leading-none">
-                    {idx + 1}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ height: 460 }} className="flex items-center justify-center text-center p-6">
-            <div>
-              <Smartphone className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-xs text-gray-400">等待组件确认后</p>
-              <p className="text-xs text-gray-400">预览将实时更新</p>
+      {/* 页面底色 = 主色浅版 */}
+      <div style={{ background: theme.primaryBg, minHeight: '100%' }}>
+
+        {/* 头图区域 — 全出血，固定高度 */}
+        <div style={{
+          height: 130,
+          background: heroImageUrl
+            ? `url(${heroImageUrl}) center/cover no-repeat`
+            : `linear-gradient(160deg, ${theme.primaryColor} 0%, ${theme.primaryText} 100%)`,
+          position: 'relative',
+        }}>
+          {!heroImageUrl && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 14 }}>
+              <p style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: 1,
+                textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}>活动标题</p>
+              <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 3 }}>活动进行中</p>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* 组件列表 */}
+        <div style={{ padding: '0 0 12px' }}>
+          {components.length > 0 ? components.map((comp, idx) => (
+            <div key={comp.id}
+              onClick={() => onSelectIdx?.(idx)}
+              style={{ position: 'relative', cursor: onSelectIdx ? 'pointer' : 'default' }}
+              className={cn(selectedIdx === idx ? 'ring-2 ring-inset' : '')}
+              {...(selectedIdx === idx ? { style: { position: 'relative', cursor: 'pointer', outline: `2px solid ${theme.primaryColor}`, outlineOffset: '-2px' } } : {})}
+            >
+              {selectedIdx === idx && (
+                <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 20,
+                  background: theme.primaryColor, color: theme.btnTextColor,
+                  fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>
+                  {idx + 1}
+                </div>
+              )}
+              <PreviewBlock component={comp} theme={theme} />
+            </div>
+          )) : (
+            <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
+              <Smartphone style={{ width: 28, height: 28, opacity: 0.2 }} />
+              <p style={{ fontSize: 10, color: '#999' }}>确认组件后实时更新</p>
+            </div>
+          )}
+        </div>
+
       </div>
     </PhoneShell>
   )
 }
 
-/* ── 预览区组件块 — 全部 10 个组件 ── */
-function PreviewBlock({ component }: { component: MatchedComponent }) {
+/* ═══════════════════════════════════════
+   通用样式工具
+═══════════════════════════════════════ */
+
+/** 白卡容器 */
+const card = (extra?: React.CSSProperties): React.CSSProperties => ({
+  margin: '8px 10px 0',
+  borderRadius: 10,
+  background: '#FFFFFF',
+  boxShadow: '0 1px 6px rgba(0,0,0,0.08)',
+  overflow: 'hidden',
+  ...extra,
+})
+
+/** 卡片标题行（带左侧竖条） */
+function CardTitle({ text, theme }: { text: string; theme: ActivityTheme }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px 6px' }}>
+      <div style={{ width: 3, height: 12, borderRadius: 2, background: theme.primaryColor }} />
+      <span style={{ fontSize: 11, fontWeight: 700, color: '#1A1A1A' }}>{text}</span>
+    </div>
+  )
+}
+
+/** 主按钮 */
+function PrimaryBtn({ text, theme, small }: { text: string; theme: ActivityTheme; small?: boolean }) {
+  return (
+    <div style={{
+      margin: small ? '0' : '0 12px 12px',
+      padding: small ? '5px 16px' : '8px 0',
+      borderRadius: 20,
+      background: theme.primaryColor,
+      color: theme.btnTextColor,
+      fontSize: small ? 10 : 12,
+      fontWeight: 700,
+      textAlign: 'center',
+      boxShadow: `0 3px 10px ${theme.primaryColor}40`,
+      cursor: 'pointer',
+    }}>{text}</div>
+  )
+}
+
+/** 描边按钮 */
+function OutlineBtn({ text, theme }: { text: string; theme: ActivityTheme }) {
+  return (
+    <div style={{
+      padding: '3px 10px', borderRadius: 12,
+      border: `1px solid ${theme.primaryColor}`,
+      color: theme.primaryColor,
+      fontSize: 9, fontWeight: 600, cursor: 'pointer',
+      whiteSpace: 'nowrap',
+    }}>{text}</div>
+  )
+}
+
+/* ═══════════════════════════════════════
+   10 个组件预览块
+═══════════════════════════════════════ */
+function PreviewBlock({ component, theme }: { component: MatchedComponent; theme: ActivityTheme }) {
   const p = (name: string) => component.params.find((x) => x.name === name)?.value
 
+  /* ── Banner ── */
   if (component.name === '活动 Banner') {
     return (
-      <div className="h-28 flex items-end p-3 bg-gradient-to-r from-orange-400 to-pink-400">
+      <div style={{ ...card({ margin: '6px 10px 0', height: 56 }),
+        background: `linear-gradient(135deg, ${theme.primaryColor} 0%, ${theme.primaryText} 100%)`,
+        display: 'flex', alignItems: 'center', padding: '0 12px' }}>
         <div>
-          <p className="text-white font-bold text-sm">{String(p('title') || '活动标题')}</p>
-          <p className="text-white/70 text-xs mt-0.5">活动进行中</p>
+          <p style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{String(p('title') || '活动标题')}</p>
+          <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>活动进行中</p>
         </div>
       </div>
     )
   }
 
+  /* ── 转盘抽奖 ── */
   if (component.name === '转盘抽奖') {
     return (
-      <div className="py-4 flex flex-col items-center bg-gradient-to-b from-blue-50 to-white">
-        <div className="w-36 h-36 rounded-full border-4 border-blue-200 bg-white flex items-center justify-center relative">
-          {[0,1,2,3,4,5].map((i) => (
-            <div key={i} className="absolute w-0.5 h-14 bg-blue-100 origin-bottom" style={{ transform: `rotate(${i*60}deg)`, bottom: '50%' }} />
-          ))}
-          <div className="w-10 h-10 rounded-full bg-orange-500 text-white font-bold text-xs z-10 shadow-lg flex items-center justify-center">抽奖</div>
+      <div style={card()}>
+        <CardTitle text="转盘抽奖" theme={theme} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0 12px' }}>
+          {/* 转盘 */}
+          <div style={{ position: 'relative', width: 90, height: 90, marginBottom: 8 }}>
+            <svg viewBox="0 0 90 90" style={{ width: '100%', height: '100%' }}>
+              {[0,1,2,3,4,5].map((i) => {
+                const a1 = (i * 60 - 90) * Math.PI / 180
+                const a2 = ((i + 1) * 60 - 90) * Math.PI / 180
+                const x1 = 45 + 40 * Math.cos(a1), y1 = 45 + 40 * Math.sin(a1)
+                const x2 = 45 + 40 * Math.cos(a2), y2 = 45 + 40 * Math.sin(a2)
+                return (
+                  <path key={i} d={`M45,45 L${x1},${y1} A40,40 0 0,1 ${x2},${y2} Z`}
+                    fill={i % 2 === 0 ? theme.primaryBg : '#F5F5F5'}
+                    stroke="#E5E5E5" strokeWidth="0.5" />
+                )
+              })}
+              {/* 中心圆 */}
+              <circle cx="45" cy="45" r="15" fill={theme.primaryColor} />
+              <text x="45" y="49" textAnchor="middle" fontSize="8" fontWeight="bold" fill={theme.btnTextColor}>抽奖</text>
+              <circle cx="45" cy="45" r="40" fill="none" stroke={theme.primaryColor} strokeWidth="1.5" opacity="0.3" />
+            </svg>
+          </div>
+          <p style={{ fontSize: 9, color: '#999', marginBottom: 8 }}>每日 {String(p('dailyLimit') ?? 3)} 次机会</p>
+          <div style={{ width: 88 }}><PrimaryBtn text="立即抽奖" theme={theme} small /></div>
         </div>
-        <p className="text-xs text-gray-500 mt-2">每日 {String(p('dailyLimit') ?? 3)} 次机会</p>
       </div>
     )
   }
 
+  /* ── 九宫格 ── */
   if (component.name === '九宫格抽奖') {
     return (
-      <div className="py-3 flex items-center justify-center bg-gradient-to-b from-purple-50 to-white">
-        <div className="grid grid-cols-3 gap-1">
-          {[1,2,3,4,'抽',5,6,7,8].map((x, i) => (
-            <div key={i} className={cn('w-11 h-11 rounded-lg flex items-center justify-center text-xs font-bold', x==='抽' ? 'bg-orange-500 text-white' : 'bg-white border border-gray-200 text-gray-500')}>
-              {x === '抽' ? '抽奖' : `奖${x}`}
-            </div>
-          ))}
+      <div style={card()}>
+        <CardTitle text="九宫格抽奖" theme={theme} />
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 4 }}>
+            {[1,2,3,4,'抽',5,6,7,8].map((x, i) => (
+              <div key={i} style={{
+                width: 38, height: 38, borderRadius: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 9, fontWeight: 700,
+                background: x === '抽' ? theme.primaryColor : '#F8F8F8',
+                border: `1px solid ${x === '抽' ? theme.primaryColor : '#EBEBEB'}`,
+                color: x === '抽' ? theme.btnTextColor : '#666',
+              }}>
+                {x === '抽' ? '抽奖' : `奖${x}`}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
+  /* ── 签到日历 ── */
   if (component.name === '签到日历') {
     return (
-      <div className="px-3 py-3">
-        <p className="text-xs font-semibold text-gray-800 mb-2">签到日历</p>
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className={cn('w-full aspect-square rounded flex items-center justify-center text-xs font-medium', i < 3 ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-400')}>
-              {i < 3 ? '✓' : i + 1}
-            </div>
-          ))}
+      <div style={card()}>
+        <CardTitle text="每日签到" theme={theme} />
+        <div style={{ padding: '4px 12px 12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3, marginBottom: 8 }}>
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} style={{
+                aspectRatio: '1', borderRadius: 5,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 9, fontWeight: 600,
+                background: i < 3 ? theme.primaryColor : '#F5F5F5',
+                color: i < 3 ? theme.btnTextColor : '#999',
+                border: i === 3 ? `1px solid ${theme.primaryColor}` : '1px solid transparent',
+              }}>
+                {i < 3 ? '✓' : i + 1}
+              </div>
+            ))}
+          </div>
+          <PrimaryBtn text="今日已签到" theme={theme} />
         </div>
       </div>
     )
   }
 
+  /* ── 任务列表 ── */
   if (component.name === '任务列表') {
     const count = Math.min(Number(p('taskCount') ?? 3), 3)
     return (
-      <div className="px-3 py-3 space-y-1.5">
-        <p className="text-xs font-semibold text-gray-800 mb-1">做任务赚次数</p>
-        {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-1.5">
-              <div className="w-6 h-6 rounded bg-green-100 flex items-center justify-center text-xs">✓</div>
-              <span className="text-xs text-gray-700">任务 {i + 1}</span>
+      <div style={card()}>
+        <CardTitle text="做任务赚次数" theme={theme} />
+        <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {Array.from({ length: count }).map((_, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '7px 0', borderBottom: i < count - 1 ? '1px solid #F0F0F0' : 'none',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 16, height: 16, borderRadius: '50%', border: `1.5px solid ${theme.primaryColor}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: theme.primaryColor }}>
+                  {i + 1}
+                </div>
+                <span style={{ fontSize: 10, color: '#333' }}>任务 {i + 1}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 9, color: theme.primaryColor }}>+1次</span>
+                <OutlineBtn text="去完成" theme={theme} />
+              </div>
             </div>
-            <span className="text-xs text-orange-500 font-medium">+1次</span>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  if (component.name === '排行榜') {
-    return (
-      <div className="px-3 py-3">
-        <p className="text-xs font-semibold text-gray-800 mb-2">{String(p('title') || '排行榜')}</p>
-        {[1,2,3].map((r) => (
-          <div key={r} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-none">
-            <span className="text-xs font-bold w-4 text-right" style={{ color: r === 1 ? '#f97316' : r === 2 ? '#94a3b8' : '#b45309' }}>{r}</span>
-            <div className="w-5 h-5 rounded-full bg-gray-200" />
-            <span className="text-xs text-gray-600">玩家{r}</span>
-            <span className="ml-auto text-xs text-gray-400">{1000 - r * 100}分</span>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  if (component.name === '倒计时') {
-    return (
-      <div className="px-3 py-2 flex items-center justify-center gap-1.5 bg-orange-50">
-        <span className="text-xs text-gray-500">{String(p('title') || '距活动结束')}</span>
-        {['02','14','36'].map((n, i) => (
-          <span key={i} className="text-sm font-bold text-white px-1.5 py-0.5 rounded bg-orange-500">{n}</span>
-        ))}
-      </div>
-    )
-  }
-
-  if (component.name === '弹窗') {
-    return (
-      <div className="px-3 py-2">
-        <div className="border border-gray-200 rounded-xl p-3 text-center bg-white">
-          <p className="text-xs font-semibold text-gray-800 mb-1">{String(p('title') || '弹窗标题')}</p>
-          <p className="text-xs text-gray-400 mb-2">弹窗内容区域</p>
-          <div className="bg-orange-500 text-white text-xs rounded-lg py-1.5">{String(p('confirmText') || '我知道了')}</div>
+          ))}
         </div>
       </div>
     )
   }
 
-  if (component.name === '公告/跑马灯') {
+  /* ── 排行榜 ── */
+  if (component.name === '排行榜') {
+    const medals = ['🥇', '🥈', '🥉']
     return (
-      <div className="px-3 py-2 flex items-center gap-2 bg-orange-50">
-        <span className="text-xs text-orange-500">📢</span>
-        <span className="text-xs text-gray-500 truncate">恭喜玩家***获得大奖！</span>
+      <div style={card()}>
+        <CardTitle text={String(p('title') || '排行榜')} theme={theme} />
+        <div style={{ padding: '0 12px 12px' }}>
+          {[1,2,3].map((r) => (
+            <div key={r} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '7px 0', borderBottom: r < 3 ? '1px solid #F5F5F5' : 'none',
+            }}>
+              <span style={{ fontSize: 14, width: 20 }}>{medals[r - 1]}</span>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#F0F0F0' }} />
+              <span style={{ fontSize: 10, color: '#333', flex: 1 }}>玩家 {r}</span>
+              <span style={{ fontSize: 10, color: theme.primaryColor, fontWeight: 600 }}>{1000 - r * 100} 分</span>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
 
-  if (component.name === '活动规则说明') {
+  /* ── 倒计时 ── */
+  if (component.name === '倒计时') {
     return (
-      <div className="px-3 py-3">
-        <p className="text-xs font-semibold text-gray-800 mb-1">活动规则</p>
-        {['活动期间每日可参与3次', '奖品将在活动结束后发放'].map((t, i) => (
-          <p key={i} className="text-xs text-gray-400 leading-relaxed">{i+1}. {t}</p>
+      <div style={{ ...card({ margin: '6px 10px 0' }),
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 6, padding: '8px 12px' }}>
+        <span style={{ fontSize: 9, color: '#666' }}>{String(p('title') || '距活动结束')}</span>
+        {['02', '14', '36'].map((n, i) => (
+          <span key={i} style={{ fontSize: 13, fontWeight: 800, color: theme.btnTextColor,
+            background: theme.primaryColor, padding: '2px 6px', borderRadius: 5,
+            boxShadow: `0 2px 6px ${theme.primaryColor}40` }}>
+            {n}
+          </span>
         ))}
       </div>
     )
   }
 
-  // 兜底
+  /* ── 弹窗 ── */
+  if (component.name === '弹窗') {
+    return (
+      <div style={{ ...card(), padding: 12, textAlign: 'center' }}>
+        <p style={{ fontSize: 12, fontWeight: 700, color: '#1A1A1A', marginBottom: 4 }}>
+          {String(p('title') || '弹窗标题')}
+        </p>
+        <p style={{ fontSize: 9, color: '#999', marginBottom: 10 }}>弹窗内容区域</p>
+        <PrimaryBtn text={String(p('confirmText') || '我知道了')} theme={theme} />
+      </div>
+    )
+  }
+
+  /* ── 公告/跑马灯 ── */
+  if (component.name === '公告/跑马灯') {
+    return (
+      <div style={{ margin: '4px 0', padding: '6px 12px',
+        background: `${theme.primaryColor}12`,
+        borderLeft: `3px solid ${theme.primaryColor}`,
+        display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 10, color: theme.primaryColor }}>📢</span>
+        <span style={{ fontSize: 9, color: '#555' }}>恭喜玩家***获得大奖！</span>
+      </div>
+    )
+  }
+
+  /* ── 活动规则说明 ── */
+  if (component.name === '活动规则说明') {
+    return (
+      <div style={card()}>
+        <CardTitle text="活动规则" theme={theme} />
+        <div style={{ padding: '0 12px 10px' }}>
+          {['活动期间每日可参与3次', '奖品将在活动结束后发放', '参与需满足等级要求'].map((t, i) => (
+            <p key={i} style={{ fontSize: 9, color: '#888', lineHeight: 1.8, paddingLeft: 12, position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 0, color: theme.primaryColor }}>{i + 1}.</span>
+              {t}
+            </p>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  /* 兜底 */
   return (
-    <div className="px-3 py-2.5 flex items-center gap-2 border-b border-gray-100">
-      <div className="w-2 h-2 rounded-full bg-gray-300" />
-      <span className="text-xs text-gray-600">{component.name}</span>
+    <div style={{ ...card(), padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ width: 6, height: 6, borderRadius: '50%', background: theme.primaryColor }} />
+      <span style={{ fontSize: 10, color: '#555' }}>{component.name}</span>
     </div>
   )
 }
